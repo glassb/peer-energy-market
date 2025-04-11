@@ -7,7 +7,7 @@ Original file is located at
     https://colab.research.google.com/drive/1InvHioQipbEuSXscVzqDYbZeOQwQ3coh
 """
 
-# 4/9
+# 4/10
 
 '''
                 node 0
@@ -23,19 +23,33 @@ Original file is located at
 
 import numpy as np
 from scipy import optimize as opt
+from scipy import linalg as linearalgebra
+
 
 '''
+Decision Variables Index: [24 energy trades + 8 Battery vars]
+[00 01 02 03 10 11 12 13 20 21 22 23 30 31 32 33 B0a B0b B1a B1b B2a B2b B3a B3b]
+
+
 00 01 02 03
 10 11 12 13
 20 21 22 23
 30 31 32 33
 '''
+#labels for printing output
+decision_variables = ['00','01','02', '03', '10', '11', '12', '13', '20', '21' ,'22', '23', '30', '31', '32', '33', 'B0a', 'B0b', 'B1a', 'B1b', 'B2a', 'B2b', 'B3a', 'B3b']
+timesteps = ['T1','T2','T3','T4']
 
-costs = [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]
-initial_guess = np.zeros(16)
+
+#costs = np.tile([1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0],4)
+
+initial_guess = np.tile(np.zeros(24),4)
+
+#we can set individual bounds for any of the decision variables
 bounds = []
 
 
+# ---------------------------------- f: POWER FLOW CONSTRAINTS
 
 #Wbar matrix for 4 node system
 Wbar = [[1,-1,0,0],
@@ -48,25 +62,38 @@ W = [Wbar[0][1:],
     Wbar[2][1:]]
 
 # linear transform to calculate f (convert energy trades to net nodal power injections at nodes 1->3)
-nodal_power_transform = [[0,0,0,0,1,1,1,1,0,0,0,0,0,0,0,0],
-                        [0,0,0,0,0,0,0,0,1,1,1,1,0,0,0,0],
-                        [0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1]]
+nodal_power_transform = [[0,0,0,0,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+                        [0,0,0,0,0,0,0,0,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0],
+                        [0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,0,0,0,0,0,0,0,0]]
+
+# block diagonalizing Wbar, W, and nodal_power_transform 4 times in order to account for 4 timesteps
+nodal_power_transform_4_timesteps = linearalgebra.block_diag(nodal_power_transform,nodal_power_transform,nodal_power_transform,nodal_power_transform)
+W_inv_T =np.transpose(np.linalg.inv(W))
+W_inv_T_4_timesteps = linearalgebra.block_diag(W_inv_T,W_inv_T,W_inv_T,W_inv_T)
 
 #calculate A matrix for constraint: lb <= Ax <= ub
-f_matrix = np.matmul(np.transpose(np.linalg.inv(W)),nodal_power_transform)
+f_matrix = np.matmul(W_inv_T_4_timesteps,nodal_power_transform_4_timesteps)
 
 #upper/lower bounds
-fmax = [10,10,10]
-fmin = [0,0,0]
+fmax = [10,10,10,10,10,10,10,10,10,10,10,10]
+fmin = [0,0,0,0,0,0,0,0,0,0,0,0]
+
+loads = [1000,1200,1100]
 
 
-loads = [100,120,110]
 
-constraint = ({'type':'eq','fun': lambda x: sum(x) - sum(loads)},
+# ---------------------------------- CONSTRAINTS
+
+constraint = ({'type':'eq','fun': lambda x: sum(x) - sum(loads)}, # we need to parition this by timestep
               {'type':'eq','fun': lambda x: x[0]},
               {'type':'eq','fun': lambda x: x[5]},
               {'type':'eq','fun': lambda x: x[10]},
               {'type':'eq','fun': lambda x: x[15]},
+              {'type':'eq','fun': lambda x: x[24]},
+              {'type':'eq','fun': lambda x: x[29]},
+              {'type':'eq','fun': lambda x: x[34]},
+              {'type':'eq','fun': lambda x: x[39]},
+
 
               # (19d) constraints
               {'type':'ineq','fun': lambda x: fmax - np.matmul(f_matrix,x)},
@@ -78,22 +105,33 @@ constraint = ({'type':'eq','fun': lambda x: sum(x) - sum(loads)},
               {'type':'eq','fun': lambda x: x[3]+x[12]},
               {'type':'eq','fun': lambda x: x[6]+x[9]},
               {'type':'eq','fun': lambda x: x[7]+x[13]},
-              {'type':'eq','fun': lambda x: x[11]+x[14]}
+              {'type':'eq','fun': lambda x: x[11]+x[14]},
+
+              {'type':'eq','fun': lambda x: x[25]+x[29]}, #timestep 2
+              {'type':'eq','fun': lambda x: x[26]+x[32]},
+              {'type':'eq','fun': lambda x: x[27]+x[36]},
+              {'type':'eq','fun': lambda x: x[30]+x[33]},
+              {'type':'eq','fun': lambda x: x[31]+x[37]},
+              {'type':'eq','fun': lambda x: x[35]+x[38]}
+
+
               )
 
 
-loads = [100,120,110]
-
+# cost function formulation: this can be quadratic or linear
 def cost_function(x):
-  Q = np.ones((16,16))
-  C = np.ones((1,16))
+  Q = np.ones((96,96))
+  C = np.ones((1,96))
   return np.matmul(np.transpose(x),np.matmul(Q,x)+np.matmul(C,x))
 
 
+# return results of optimization problem
 results = opt.minimize(fun=cost_function,x0=initial_guess,constraints=constraint)
 
 
-print(results.x)
+# printing the output
+for i in range(96):
+  print(timesteps[i // 24],'--',decision_variables[i % 24],':  ',np.round(results.x[i],2),'kW')
 
 # DRAFT CODE - 4/1
 
