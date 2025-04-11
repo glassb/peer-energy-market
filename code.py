@@ -62,9 +62,9 @@ W = [Wbar[0][1:],
     Wbar[2][1:]]
 
 # linear transform to calculate f (convert energy trades to net nodal power injections at nodes 1->3)
-nodal_power_transform = [[0,0,0,0,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
-                        [0,0,0,0,0,0,0,0,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0],
-                        [0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,0,0,0,0,0,0,0,0]]
+nodal_power_transform = [[0,0,0,0,1,1,1,1,0,0,0,0,0,0,0,0,0,0,-1,0,0,0,0,0],
+                        [0,0,0,0,0,0,0,0,1,1,1,1,0,0,0,0,0,0,0,0,-1,0,0,0],
+                        [0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,0,0,0,0,0,0,-1,0]]
 
 # block diagonalizing Wbar, W, and nodal_power_transform 4 times in order to account for 4 timesteps
 nodal_power_transform_4_timesteps = linearalgebra.block_diag(nodal_power_transform,nodal_power_transform,nodal_power_transform,nodal_power_transform)
@@ -177,6 +177,26 @@ results = opt.minimize(fun=cost_function,x0=initial_guess,constraints=constraint
 # printing the output
 for i in range(96):
   print(timesteps[i // 24],'--',decision_variables[i % 24],':  ',np.round(results.x[i],2),'kW')
+
+
+
+
+
+
+
+
+
+# ------------------------
+# ------------------------
+# ------------------------
+  #      OLD CODE BELOW
+# ------------------------
+# ------------------------
+# ------------------------
+
+
+
+
 
 # DRAFT CODE - 4/1
 
