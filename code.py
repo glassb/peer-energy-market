@@ -34,13 +34,51 @@ from scipy import optimize as opt
 costs = [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]
 initial_guess = np.zeros(16)
 bounds = []
+
+
+
+#Wbar matrix for 4 node system
+Wbar = [[1,-1,0,0],
+        [1,0,-1,0],
+        [0,1,0,-1]]
+
+#W matrix for 4 node system
+W = [Wbar[0][1:],
+    Wbar[1][1:],
+    Wbar[2][1:]]
+
+# linear transform to calculate f (convert energy trades to net nodal power injections at nodes 1->3)
+nodal_power_transform = [[0,0,0,0,1,1,1,1,0,0,0,0,0,0,0,0],
+                        [0,0,0,0,0,0,0,0,1,1,1,1,0,0,0,0],
+                        [0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1]]
+
+#calculate A matrix for constraint: lb <= Ax <= ub
+f_matrix = np.matmul(np.transpose(np.linalg.inv(W)),nodal_power_transform)
+
+#upper/lower bounds
+fmax = [10,10,10]
+fmin = [0,0,0]
+
+
+loads = [100,120,110]
+
 constraint = ({'type':'eq','fun': lambda x: sum(x) - sum(loads)},
               {'type':'eq','fun': lambda x: x[0]},
               {'type':'eq','fun': lambda x: x[5]},
               {'type':'eq','fun': lambda x: x[10]},
               {'type':'eq','fun': lambda x: x[15]},
+
+              # (19d) constraints
+              {'type':'ineq','fun': lambda x: fmax - np.matmul(f_matrix,x)},
+              {'type':'ineq','fun': lambda x: np.multiply(-1,fmin) + np.matmul(f_matrix,x)},
+
+              # (19e) constraints
               {'type':'eq','fun': lambda x: x[1]+x[5]},
-              {'type':'eq','fun': lambda x: x[2]+x[9]}
+              {'type':'eq','fun': lambda x: x[2]+x[8]},
+              {'type':'eq','fun': lambda x: x[3]+x[12]},
+              {'type':'eq','fun': lambda x: x[6]+x[9]},
+              {'type':'eq','fun': lambda x: x[7]+x[13]},
+              {'type':'eq','fun': lambda x: x[11]+x[14]}
               )
 
 
