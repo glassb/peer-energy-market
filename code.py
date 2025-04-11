@@ -80,6 +80,12 @@ fmin = [0,0,0,0,0,0,0,0,0,0,0,0]
 
 loads = [1000,1200,1100]
 
+#Start each battery with 50kWh, all have the same hardware settings
+batt_initial = [50, 50, 50, 50]
+batt_min_e = [20, 20, 20, 20]
+batt_max_e = [80, 80, 80, 80]
+batt_min_p = [-10, -10, -10, -10]
+batt_max_p = [10, 10, 10, 10]
 
 
 # ---------------------------------- CONSTRAINTS
@@ -112,8 +118,16 @@ constraint = ({'type':'eq','fun': lambda x: sum(x) - sum(loads)}, # we need to p
               {'type':'eq','fun': lambda x: x[27]+x[36]},
               {'type':'eq','fun': lambda x: x[30]+x[33]},
               {'type':'eq','fun': lambda x: x[31]+x[37]},
-              {'type':'eq','fun': lambda x: x[35]+x[38]}
+              {'type':'eq','fun': lambda x: x[35]+x[38]},
 
+              #Battery Constraints - Also need battery power in power-flow constraints
+              #Power Min
+              #Power Max
+              #Charge State Min
+              #Charge State Max
+              #Charge-State change after time iteration
+              #Initial Charge State (at time zero, need to initialize battery charge
+              #{'type':'eq','fun': lambda x: x[35]+x[38]}
 
               )
 
@@ -134,26 +148,25 @@ and b is a vector [b1 b1 b1 b2 b2 b2]
 
 corresponding to the indices of i. That is, all entries in a and b will be ai and bi for pi
 '''
-quad_coefficients = [.1, .2, .3, .4]
-lin_coefficients = [5, 6, 7, 8]
 
-nodecount = len(quad_coefficients)
-timecount = len(timesteps)
-
-Q = np.zeros((96, 96))
-C = np.zeros((96))
-for t in range(timecount):
-  for i in range(nodecount):
-    for j in range(nodecount):
-      indexval = t*((nodecount**2) + (nodecount * 2)) + i*nodecount + j
-      Q[indexval][indexval] = quad_coefficients[i]
-      C[indexval] = lin_coefficients[i]
 
 
 def cost_function(x):
+  quad_coefficients = [.1, .2, .3, .4]
+  lin_coefficients = [5, 6, 7, 8]
 
-  Q = np.ones((96,96))
-  C = np.ones((1,96))
+  nodecount = len(quad_coefficients)
+  timecount = len(timesteps)
+
+  Q = np.zeros((96, 96))
+  C = np.zeros((96))
+  for t in range(timecount):
+    for i in range(nodecount):
+      for j in range(nodecount):
+        indexval = t * ((nodecount ** 2) + (nodecount * 2)) + i * nodecount + j
+        Q[indexval][indexval] = quad_coefficients[i]
+        C[indexval] = lin_coefficients[i]
+
   return np.matmul(np.transpose(x),np.matmul(Q,x)+np.matmul(C,x))
 
 
