@@ -28,7 +28,7 @@ from scipy import linalg as linearalgebra
 
 '''
 Decision Variables Index: [24 energy trades + 8 Battery vars]
-[00 01 02 03 10 11 12 13 20 21 22 23 30 31 32 33 B0a B0b B1a B1b B2a B2b B3a B3b]
+[00 01 02 03 10 11 12 13 20 21 22 23 30 31 32 33 B0p B0e B1p B1e B2p B2e B3p B3e]
 
 
 00 01 02 03
@@ -37,7 +37,7 @@ Decision Variables Index: [24 energy trades + 8 Battery vars]
 30 31 32 33
 '''
 #labels for printing output
-decision_variables = ['00','01','02', '03', '10', '11', '12', '13', '20', '21' ,'22', '23', '30', '31', '32', '33', 'B0a', 'B0b', 'B1a', 'B1b', 'B2a', 'B2b', 'B3a', 'B3b']
+decision_variables = ['00','01','02', '03', '10', '11', '12', '13', '20', '21' ,'22', '23', '30', '31', '32', '33', 'B0p', 'B0e', 'B1p', 'B1e', 'B2p', 'B2e', 'B3p', 'B3e']
 timesteps = ['T1','T2','T3','T4']
 
 
@@ -119,7 +119,39 @@ constraint = ({'type':'eq','fun': lambda x: sum(x) - sum(loads)}, # we need to p
 
 
 # cost function formulation: this can be quadratic or linear
+'''
+consumer charge is form ax^2 + bx where a and b are coefficients chosen by the consumer
+To get in the cost function form we will see (x)T*A*x + bx where A a matrix form:
+
+[a1 0   0   0   0   0]
+[0  a1  0   0   0   0]
+[0  0   a1  0   0   0]
+[0  0   0   a2  0   0]
+[0  0   0   0   a2  0]
+[0  0   0   0   0  a2]
+
+and b is a vector [b1 b1 b1 b2 b2 b2]
+
+corresponding to the indices of i. That is, all entries in a and b will be ai and bi for pi
+'''
+quad_coefficients = [.1, .2, .3, .4]
+lin_coefficients = [5, 6, 7, 8]
+
+nodecount = len(quad_coefficients)
+timecount = len(timesteps)
+
+Q = np.zeros((96, 96))
+C = np.zeros((96))
+for t in range(timecount):
+  for i in range(nodecount):
+    for j in range(nodecount):
+      indexval = t*((nodecount**2) + (nodecount * 2)) + i*nodecount + j
+      Q[indexval][indexval] = quad_coefficients[i]
+      C[indexval] = lin_coefficients[i]
+
+
 def cost_function(x):
+
   Q = np.ones((96,96))
   C = np.ones((1,96))
   return np.matmul(np.transpose(x),np.matmul(Q,x)+np.matmul(C,x))
