@@ -183,6 +183,26 @@ results = opt.minimize(fun=cost_function, args=(quadratic_coefficients, linear_c
 for i in range(96):
   print(timesteps[i // 24],'--',decision_variables[i % 24],':  ',np.round(results.x[i],2),'kW')
 
+
+
+
+
+
+
+
+
+# ------------------------
+# ------------------------
+# ------------------------
+  #      OLD CODE BELOW
+# ------------------------
+# ------------------------
+# ------------------------
+
+
+
+
+
 # DRAFT CODE - 4/1
 
 import numpy as np
