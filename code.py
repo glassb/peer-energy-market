@@ -88,6 +88,11 @@ batt_min_p = [-10, -10, -10, -10]
 batt_max_p = [10, 10, 10, 10]
 
 
+#These values are the prosumer bid pricing coefficients for prosumer i
+quadratic_coefficients = [.1, .2, .3, .4]
+linear_coefficients = [5, 6, 7, 8]
+
+
 # ---------------------------------- CONSTRAINTS
 
 constraint = ({'type':'eq','fun': lambda x: sum(x) - sum(loads)}, # we need to parition this by timestep
@@ -149,11 +154,11 @@ and b is a vector [b1 b1 b1 b2 b2 b2]
 corresponding to the indices of i. That is, all entries in a and b will be ai and bi for pi
 '''
 
+#These values are the utility service charge prices
+#depend on trade between i to j, because of distances between i and j
+utility_coefficiens = []
 
-
-def cost_function(x):
-  quad_coefficients = [.1, .2, .3, .4]
-  lin_coefficients = [5, 6, 7, 8]
+def cost_function(x, quad_coefficients, lin_coefficients):
 
   nodecount = len(quad_coefficients)
   timecount = len(timesteps)
@@ -167,11 +172,11 @@ def cost_function(x):
         Q[indexval][indexval] = quad_coefficients[i]
         C[indexval] = lin_coefficients[i]
 
-  return np.matmul(np.transpose(x),np.matmul(Q,x)+np.matmul(C,x))
+  return np.matmul(np.transpose(x),np.matmul(Q,x)) + np.matmul(C,x)
 
 
 # return results of optimization problem
-results = opt.minimize(fun=cost_function,x0=initial_guess,constraints=constraint)
+results = opt.minimize(fun=cost_function, args=(quadratic_coefficients, linear_coefficients),x0=initial_guess,constraints=constraint)
 
 
 # printing the output
