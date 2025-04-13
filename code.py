@@ -40,8 +40,10 @@ Decision Variables Index: [24 energy trades + 8 Battery vars]
 decision_variables = ['00','01','02', '03', '10', '11', '12', '13', '20', '21' ,'22', '23', '30', '31', '32', '33', 'B0p', 'B0e', 'B1p', 'B1e', 'B2p', 'B2e', 'B3p', 'B3e']
 timesteps = ['T1','T2','T3','T4']
 
-
-#costs = np.tile([1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0],4)
+#Problem setup
+timeblocks_no = 4
+vars_per_timeblock = 24
+nodecount = 4
 
 initial_guess = np.tile(np.zeros(24),4)
 
@@ -93,37 +95,45 @@ quadratic_coefficients = [.1, .2, .3, .4]
 linear_coefficients = [5, 6, 7, 8]
 
 
+#(19e) constraint matrix
+constraints_per_time = 10
+e_constraint_mtx = np.zeros((constraints_per_time * timeblocks_no, vars_per_timeblock * timeblocks_no))
+
+for i in range(timeblocks_no): #this loop iterates through time blocks
+
+  #Trade Balance, power sent = power received from i to j
+  e_constraint_mtx[0+(i*constraints_per_time)][1+(i*vars_per_timeblock)] = 1; # 0 -> 1
+  e_constraint_mtx[0+(i*constraints_per_time)][5+(i*vars_per_timeblock)] = 1; # 1 -> 0
+  e_constraint_mtx[1+(i*constraints_per_time)][2+(i*vars_per_timeblock)] = 1; # 0 -> 2
+  e_constraint_mtx[1+(i*constraints_per_time)][8+(i*vars_per_timeblock)] = 1; # 2 -> 0
+  e_constraint_mtx[2+(i*constraints_per_time)][3+(i*vars_per_timeblock)] = 1; # 0 -> 3
+  e_constraint_mtx[2+(i*constraints_per_time)][12+(i*vars_per_timeblock)] = 1; # 3 -> 0
+  e_constraint_mtx[3+(i*constraints_per_time)][6+(i*vars_per_timeblock)] = 1; # 1 -> 2
+  e_constraint_mtx[3+(i*constraints_per_time)][9+(i*vars_per_timeblock)] = 1; # 2 -> 1
+  e_constraint_mtx[4+(i*constraints_per_time)][7+(i*vars_per_timeblock)] = 1; # 1 -> 3
+  e_constraint_mtx[4+(i*constraints_per_time)][13+(i*vars_per_timeblock)] = 1; # 3 -> 1
+  e_constraint_mtx[5+(i*constraints_per_time)][11+(i*vars_per_timeblock)] = 1; # 2 -> 3
+  e_constraint_mtx[5+(i*constraints_per_time)][14+(i*vars_per_timeblock)] = 1; # 3 -> 2
+
+  #Self-trades
+  e_constraint_mtx[6+(i*constraints_per_time)][0+(i*vars_per_timeblock)] = 1; # 0 -> 0
+  e_constraint_mtx[7+(i*constraints_per_time)][5+(i*vars_per_timeblock)] = 1; # 1 -> 1
+  e_constraint_mtx[8+(i*constraints_per_time)][10+(i*vars_per_timeblock)] = 1; # 2 -> 2
+  e_constraint_mtx[9+(i*constraints_per_time)][15+(i*vars_per_timeblock)] = 1; # 3 -> 3
+
+
+
 # ---------------------------------- CONSTRAINTS
 
-constraint = ({'type':'eq','fun': lambda x: sum(x) - sum(loads)}, # we need to parition this by timestep
-              {'type':'eq','fun': lambda x: x[0]},
-              {'type':'eq','fun': lambda x: x[5]},
-              {'type':'eq','fun': lambda x: x[10]},
-              {'type':'eq','fun': lambda x: x[15]},
-              {'type':'eq','fun': lambda x: x[24]},
-              {'type':'eq','fun': lambda x: x[29]},
-              {'type':'eq','fun': lambda x: x[34]},
-              {'type':'eq','fun': lambda x: x[39]},
-
+constraint = (#is this top one still necessary?
+              {'type':'eq','fun': lambda x: sum(x) - sum(loads)},  # we need to parition this by timestep
 
               # (19d) constraints
               {'type':'ineq','fun': lambda x: fmax - np.matmul(f_matrix,x)},
               {'type':'ineq','fun': lambda x: np.multiply(-1,fmin) + np.matmul(f_matrix,x)},
 
               # (19e) constraints
-              {'type':'eq','fun': lambda x: x[1]+x[5]},
-              {'type':'eq','fun': lambda x: x[2]+x[8]},
-              {'type':'eq','fun': lambda x: x[3]+x[12]},
-              {'type':'eq','fun': lambda x: x[6]+x[9]},
-              {'type':'eq','fun': lambda x: x[7]+x[13]},
-              {'type':'eq','fun': lambda x: x[11]+x[14]},
-
-              {'type':'eq','fun': lambda x: x[25]+x[29]}, #timestep 2
-              {'type':'eq','fun': lambda x: x[26]+x[32]},
-              {'type':'eq','fun': lambda x: x[27]+x[36]},
-              {'type':'eq','fun': lambda x: x[30]+x[33]},
-              {'type':'eq','fun': lambda x: x[31]+x[37]},
-              {'type':'eq','fun': lambda x: x[35]+x[38]},
+              {'type':'eq','fun': lambda x: np.matmul(e_constraint_mtx, x)},  #do all at once, timesteps now included
 
               #Battery Constraints - Also need battery power in power-flow constraints
               #Power Min
@@ -160,12 +170,9 @@ utility_coefficiens = []
 
 def cost_function(x, quad_coefficients, lin_coefficients):
 
-  nodecount = len(quad_coefficients)
-  timecount = len(timesteps)
-
-  Q = np.zeros((96, 96))
-  C = np.zeros((96))
-  for t in range(timecount):
+  Q = np.zeros((vars_per_timeblock * timeblocks_no, vars_per_timeblock * timeblocks_no))
+  C = np.zeros((vars_per_timeblock * timeblocks_no))
+  for t in range(timeblocks_no):
     for i in range(nodecount):
       for j in range(nodecount):
         indexval = t * ((nodecount ** 2) + (nodecount * 2)) + i * nodecount + j
