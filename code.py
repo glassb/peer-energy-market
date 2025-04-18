@@ -58,8 +58,8 @@ bounds = []
 
 #Wbar matrix for 4 node system
 Wbar = [[1,-1,0,0],
-        [1,0,-1,0],
-        [0,1,0,-1]]
+        [0,1,-1,0],
+        [0,0,1,-1]]
 
 #W matrix for 4 node system
 W = [Wbar[0][1:],
