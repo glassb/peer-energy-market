@@ -34,8 +34,7 @@ Decision Variables Index: [24 energy trades + 8 Battery vars]
 30 31 32 33
 '''
 #labels for printing output
-#Ryan Update
-decision_variables = ['00','01','02', '03', '10', '11', '12', '13', '20', '21' ,'22', '23', '30', '31', '32', '33', 'B0p', 'B0e', 'B1p', 'B1e', 'B2p', 'B2e', 'B3p', 'B3e']
+decision_variables = ['00','01','02', '03', '10', '11', '12', '13', '20', '21' ,'22', '23', '30', '31', '32', '33']
 timesteps = ['T1','T2','T3','T4']
 
 #Problem setup
@@ -172,7 +171,7 @@ def cost_function(x, quad_coefficients, lin_coefficients):
   for t in range(timeblocks_no):
     for i in range(nodecount):
       for j in range(nodecount):
-        indexval = t * ((nodecount ** 2) + (nodecount * 2)) + i * nodecount + j
+        indexval = t * (nodecount ** 2) + i * nodecount + j
         Q[indexval][indexval] = quad_coefficients[i]
         C[indexval] = lin_coefficients[i]
 
@@ -184,6 +183,6 @@ results = opt.minimize(fun=cost_function, args=(quadratic_coefficients, linear_c
 
 
 # printing the output
-for i in range(96):
-  print(timesteps[i // 24],'--',decision_variables[i % 24],':  ',np.round(results.x[i],2),'kW')
+for i in range(64):
+  print(timesteps[i // 16],'--',decision_variables[i % 16],':  ',np.round(results.x[i],2),'kW')
 
