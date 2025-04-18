@@ -11,13 +11,8 @@ Original file is located at
 # 4/10
 
 '''
-                node 0
-                /   \
-               /     \
-          node 1    node 2
-          /
-         /
-      node 3
+          
+          node 0 (slack) ------- node 1 ------- node 2 ------- node 3
 
 
 '''
@@ -67,9 +62,9 @@ W = [Wbar[0][1:],
     Wbar[2][1:]]
 
 # linear transform to calculate f (convert energy trades to net nodal power injections at nodes 1->3)
-nodal_power_transform = [[0,0,0,0,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
-                        [0,0,0,0,0,0,0,0,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0],
-                        [0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,0,0,0,0,0,0,0,0]]
+nodal_power_transform = [[0,0,0,0,1,1,1,1,0,0,0,0,0,0,0,0],
+                        [0,0,0,0,0,0,0,0,1,1,1,1,0,0,0,0],
+                        [0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1]]
 
 # block diagonalizing Wbar, W, and nodal_power_transform 4 times in order to account for 4 timesteps
 nodal_power_transform_4_timesteps = linearalgebra.block_diag(nodal_power_transform,nodal_power_transform,nodal_power_transform,nodal_power_transform)
