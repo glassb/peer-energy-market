@@ -39,20 +39,22 @@ Decision Variables Index: [24 energy trades + 8 Battery vars]
 30 31 32 33
 '''
 #labels for printing output
+#Ryan Update
 decision_variables = ['00','01','02', '03', '10', '11', '12', '13', '20', '21' ,'22', '23', '30', '31', '32', '33', 'B0p', 'B0e', 'B1p', 'B1e', 'B2p', 'B2e', 'B3p', 'B3e']
 timesteps = ['T1','T2','T3','T4']
 
 #Problem setup
 timeblocks_no = 4
-vars_per_timeblock = 24
+vars_per_timeblock = 16
 nodecount = 4
 
-initial_guess = np.tile(np.zeros(24),4)
+
+initial_guess = np.tile(np.zeros(vars_per_timeblock),timeblocks_no)
 
 #we can set individual bounds for any of the decision variables
 bounds = []
 
-
+#Ben update
 # ---------------------------------- f: POWER FLOW CONSTRAINTS
 
 #Wbar matrix for 4 node system
@@ -82,8 +84,8 @@ f_matrix = np.matmul(W_inv_T_4_timesteps,nodal_power_transform_4_timesteps)
 fmax = [10,10,10,10,10,10,10,10,10,10,10,10]
 fmin = [0,0,0,0,0,0,0,0,0,0,0,0]
 
-loads = [1000,1200,1100]
 
+#Ryan Update
 #Start each battery with 50kWh, all have the same hardware settings
 batt_initial = [50, 50, 50, 50]
 batt_min_e = [20, 20, 20, 20]
@@ -96,7 +98,7 @@ batt_max_p = [10, 10, 10, 10]
 quadratic_coefficients = [.1, .2, .3, .4]
 linear_coefficients = [5, 6, 7, 8]
 
-
+#Ryan Update
 #(19e) constraint matrix
 constraints_per_time = 10
 e_constraint_mtx = np.zeros((constraints_per_time * timeblocks_no, vars_per_timeblock * timeblocks_no))
@@ -127,9 +129,7 @@ for i in range(timeblocks_no): #this loop iterates through time blocks
 
 # ---------------------------------- CONSTRAINTS
 
-constraint = (#is this top one still necessary?
-              {'type':'eq','fun': lambda x: sum(x) - sum(loads)},  # we need to parition this by timestep
-
+constraint = (
               # (19d) constraints
               {'type':'ineq','fun': lambda x: fmax - np.matmul(f_matrix,x)},
               {'type':'ineq','fun': lambda x: np.multiply(-1,fmin) + np.matmul(f_matrix,x)},
@@ -192,171 +192,3 @@ results = opt.minimize(fun=cost_function, args=(quadratic_coefficients, linear_c
 for i in range(96):
   print(timesteps[i // 24],'--',decision_variables[i % 24],':  ',np.round(results.x[i],2),'kW')
 
-
-
-
-
-
-
-
-
-# ------------------------
-# ------------------------
-# ------------------------
-  #      OLD CODE BELOW
-# ------------------------
-# ------------------------
-# ------------------------
-
-
-
-
-
-# DRAFT CODE - 4/1
-
-import numpy as np
-from scipy import optimize as opt
-
-
-#3 node system
-'''
-                node 0
-                /   \
-               /     \
-          node 1    node 2
-
-
-'''
-
-#------------------------------ FRONT MATTER
-q = [0,1,1] #define reactive power starting at node 0, node 1, etc...
-
-
-
-#cost function
-cost = [1,1.2,.9];
-
-#------------------------------ LINE FLOW CONSTRAINTS
-
-#f (power flow constraints)
-# creating the W matrix (see page 3 in lit)
-W_bar = [[1,-1.,0.],[1,0.,1.]]
-W = [[-1.,0.],[0.,1.]]
-W_inv_T = np.transpose(np.linalg.inv(np.array(W)))
-W_inv_T_cat = np.concatenate((np.zeros((2,1)),W_inv_T),axis=1)
-W_total = np.concatenate((W_inv_T_cat,-1*W_inv_T_cat),axis=0)
-
-# f bounds (first two values) and lower bounds (second two values)
-f_bounds = [10,10,10,10]
-
-#------------------------------ BALANCING CONSTRAINTS (ensuring Generation = Demand)
-
-#ensuring power generation equals demand
-A_eq_total = np.ones((1,3))
-#demand
-b_eq_total = 25.2;
-
-
-#------------------------------ VOLTAGE CONSTRAINTS
-#v (voltage constraints)
-
-Fr = [[.1,0],[0,.2]] #diagonal matrix of line resistances
-Fx = [[.1,0],[0,.2]] #diagonal matrix of line reactances
-
-R = np.matmul(np.matmul(np.linalg.inv(W),Fr),np.transpose(np.linalg.inv(np.array(W))))
-R = np.concatenate((np.zeros((2,1)),R),axis=1)
-R_total = np.concatenate((R,-1*R),axis=0)
-X = np.matmul(np.matmul(np.linalg.inv(W),Fx),np.transpose(np.linalg.inv(np.array(W))))
-X = np.concatenate((np.zeros((2,1)),X),axis=1)
-v_bar = np.matmul(X,q) + np.ones((1,2))
-v_bar_double = np.concatenate((v_bar,v_bar),axis=1)
-v_bounds = [2,2,2,2] - v_bar_double[0]
-
-
-
-
-
-#------------------------------ REAL POWER CONSTRAINTS
-#p constraints
-#p upper and lower power bounds
-p0 = (1,15)
-p1 = (1,10)
-p2 = (1,10)
-
-
-A_ineq_total = np.concatenate((W_total,R_total),axis=0)
-b_ineq_total = np.concatenate((f_bounds,v_bounds),axis=0)
-
-
-
-output = opt.linprog(cost,
-                     A_ub=A_ineq_total,
-                     b_ub=b_ineq_total,
-                     A_eq=A_eq_total,
-                     b_eq=b_eq_total,
-                     bounds=[p0,p1,p2])
-print(output)
-
-# DRAFT CODE - 4/1
-
-import numpy as np
-from scipy import optimize as opt
-
-
-#cost function
-cost = [1,1,1,1,1,1];
-
-
-#pij balance matrix
-'''
-01
-02
-10
-12
-20
-21
-'''
-balances = [[1,0,1,0,0,0],[0,1,0,0,1,0],[0,0,0,1,0,1]]
-balance_outputs = np.zeros((1,3))
-
-
-p01 = (None,None)
-p02 = (None,None)
-p10 = (12,12)
-p12 = (0,0)
-p20 = (10,10)
-p21 = (0,0)
-
-
-consolid = np.array([[1,1,0,0,0,0],[0,0,1,1,0,0],[0,0,0,0,1,1]])
-p_limit = [100,100,100]
-
-
-# creating the W matrix (see page 3 in lit)
-W_bar = [[1,-1,0],[1,0,1]]
-W = [[-1,0],[0,1]]
-W_inv_T = np.transpose(np.linalg.inv(np.array(W)))
-W_inv_T_cat = np.concatenate((np.zeros((2,1)),W_inv_T),axis=1)
-W_total = np.concatenate((W_inv_T_cat,-1*W_inv_T_cat),axis=0)
-W_total = np.matmul(W_total,consolid)
-
-# f bounds (first two values) and lower bounds (second two values)
-f_bounds = [100,100,100,100]
-
-
-A_ineq_total = np.concatenate((W_total,consolid),axis=0)
-A_ineq_total = np.concatenate((A_ineq_total,-1*consolid),axis=0)
-
-b_ineq_total = np.concatenate((f_bounds,p_limit),axis=0)
-b_ineq_total = np.concatenate((b_ineq_total,p_limit),axis=0)
-
-
-
-output = opt.linprog(cost,
-                     A_ub=A_ineq_total,
-                     b_ub=b_ineq_total,
-                     A_eq=balances,
-                     b_eq=balance_outputs,
-                     bounds=[p01,p02,p10,p12,p20,p21])
-
-print(output)
