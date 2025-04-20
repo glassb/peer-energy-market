@@ -24,8 +24,8 @@ from scipy import linalg as linearalgebra
 
 
 '''
-Decision Variables Index: [24 energy trades + 8 Battery vars]
-[00 01 02 03 10 11 12 13 20 21 22 23 30 31 32 33 B0p B0e B1p B1e B2p B2e B3p B3e]
+Decision Variables Index: [24 energy trades]
+[00 01 02 03 10 11 12 13 20 21 22 23 30 31 32 33]
 
 
 00 01 02 03
@@ -47,6 +47,70 @@ initial_guess = np.tile(np.zeros(vars_per_timeblock),timeblocks_no)
 
 #we can set individual bounds for any of the decision variables
 bounds = []
+# ---------------------------------- General Variables
+
+
+
+
+
+# ---------------------------------- b: HARDWARE POWER CONSTRAINTS
+# x is a vector of 16*4 variables
+
+# Incidence matrix so that sum_pij * x(optimization variables) = P_b + P_i
+sum_pij = np.array([[0,0,0,0,1,1,1,1,0,0,0,0,0,0,0,0],
+                    [0,0,0,0,0,0,0,0,1,1,1,1,0,0,0,0],
+                    [0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1]])
+
+sum_pij_4_timesteps = linearalgebra.block_diag(sum_pij,sum_pij,sum_pij,sum_pij)
+
+# might need to play around with these values
+hardware_p_max = [2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2]
+hardware_p_min = [8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8]
+
+constraint_19b_min =  {'type':'ineq','fun': lambda x: np.matmul(sum_pij_4_timesteps, x) - hardware_p_min}
+constraint_19b_max =  {'type':'ineq','fun': lambda x: hardware_p_max - np.matmul(sum_pij_4_timesteps, x)}
+
+# ---------------------------------- c: VOLTAGE CONSTRAINTS
+
+# make R matrix and v bar
+big_Wbar = np.array([[1,-1,0,0],      # 0 -> 1
+                     [0,1,-1,0],      # 1 -> 2
+                     [0,0,1,-1]])     # 2 -> 3
+
+big_W = np.array([big_Wbar[0][1:],
+                  big_Wbar[1][1:],
+                  big_Wbar[2][1:]])
+
+little_wbar = np.array([[big_Wbar[0][0]],
+                        [big_Wbar[1][0]],
+                        [big_Wbar[2][0]]])
+
+big_W_inv = np.linalg.inv(big_W)
+
+big_W_inv_T = np.transpose(big_W_inv)
+
+# values adopted from paper 43 referenced in Ullah and Park. Units in ohms.
+F_r = np.diag([1.3509, 1.17024, 0.84111])                      
+F_x = np.diag([1.32349, 1.14464, 0.82271])          
+
+q_constant = np.array([[2],
+                       [2],
+                       [2]])
+
+# v = (R_matrix * sum_pij * x) + v_bar
+R_matrix = np.matmul(np.matmul(big_W_inv, F_r), big_W_inv_T)
+v_bar = np.matmul(big_W_inv, -1*little_wbar) + np.matmul(np.matmul(np.matmul(big_W_inv, F_x), big_W_inv_T), q_constant) 
+
+R_matrix_4_timesteps = linearalgebra.block_diag(R_matrix,R_matrix,R_matrix,R_matrix)
+v_bar_4_timesteps = linearalgebra.block_diag(v_bar,v_bar,v_bar,v_bar)
+
+# upper and lower bounds
+v_max = [1.05,1.05,1.05,1.05,1.05,1.05,1.05,1.05,1.05,1.05,1.05,1.05]
+v_min = [0.95,0.95,0.95,0.95,0.95,0.95,0.95,0.95,0.95,0.95,0.95,0.95]
+
+# f(x) >= 0 
+constraint_19c_min =  {'type':'ineq','fun': lambda x: (np.matmul(R_matrix_4_timesteps,x) + v_bar_4_timesteps) - v_min}
+constraint_19c_max =  {'type':'ineq','fun': lambda x: v_max - (np.matmul(R_matrix_4_timesteps,x) + v_bar_4_timesteps)}
 
 #Ben update
 # ---------------------------------- f: POWER FLOW CONSTRAINTS
@@ -124,6 +188,15 @@ for i in range(timeblocks_no): #this loop iterates through time blocks
 # ---------------------------------- CONSTRAINTS
 
 constraint = (
+
+              # (19b) constraints: Harware Power Constraints
+              constraint_19b_min,
+              constraint_19b_max,
+
+              # (19c) constraints: Voltage Constraints
+              constraint_19c_min,
+              constraint_19c_max,
+            
               # (19d) constraints
               {'type':'ineq','fun': lambda x: fmax - np.matmul(f_matrix,x)},
               {'type':'ineq','fun': lambda x: np.multiply(-1,fmin) + np.matmul(f_matrix,x)},
