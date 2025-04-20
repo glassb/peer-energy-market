@@ -98,19 +98,21 @@ q_constant = np.array([[2],
                        [2]])
 
 # v = (R_matrix * sum_pij * x) + v_bar
-R_matrix = np.matmul(np.matmul(big_W_inv, F_r), big_W_inv_T)
-v_bar = np.matmul(big_W_inv, -1*little_wbar) + np.matmul(np.matmul(np.matmul(big_W_inv, F_x), big_W_inv_T), q_constant) 
+R_matrix = np.matmul(np.matmul(big_W_inv, F_r), big_W_inv_T)                                                                   #3x3
+v_bar = np.matmul(big_W_inv, -1*little_wbar) + np.matmul(np.matmul(np.matmul(big_W_inv, F_x), big_W_inv_T), q_constant)        #3x1
 
-R_matrix_4_timesteps = linearalgebra.block_diag(R_matrix,R_matrix,R_matrix,R_matrix)
-v_bar_4_timesteps = linearalgebra.block_diag(v_bar,v_bar,v_bar,v_bar)
+R_matrix_4_timesteps = linearalgebra.block_diag(R_matrix,R_matrix,R_matrix,R_matrix)                                          #12x12
+v_bar_4_timesteps = np.vstack((v_bar,v_bar,v_bar,v_bar))                                                                      #12x1
+
 
 # upper and lower bounds
 v_max = [1.05,1.05,1.05,1.05,1.05,1.05,1.05,1.05,1.05,1.05,1.05,1.05]
 v_min = [0.95,0.95,0.95,0.95,0.95,0.95,0.95,0.95,0.95,0.95,0.95,0.95]
 
-# f(x) >= 0 
-constraint_19c_min =  {'type':'ineq','fun': lambda x: (np.matmul(R_matrix_4_timesteps,x) + v_bar_4_timesteps) - v_min}
-constraint_19c_max =  {'type':'ineq','fun': lambda x: v_max - (np.matmul(R_matrix_4_timesteps,x) + v_bar_4_timesteps)}
+# f(x) >= 0                                                        12x12                           12x64   64x1              12x1                12x1
+constraint_19c_min =  {'type':'ineq','fun': lambda x: (np.matmul(R_matrix_4_timesteps, np.matmul(sum_pij_4_timesteps,x)) + v_bar_4_timesteps) - v_min}
+constraint_19c_max =  {'type':'ineq','fun': lambda x: v_max - (np.matmul(R_matrix_4_timesteps,np.matmul(sum_pij_4_timesteps,x)) + v_bar_4_timesteps)}
+
 
 #Ben update
 # ---------------------------------- f: POWER FLOW CONSTRAINTS
