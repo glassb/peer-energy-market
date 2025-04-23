@@ -240,7 +240,7 @@ for i in range(timeblocks_no): #this loop iterates through time blocks
 
   #Trade Balance, power sent = power received from i to j
   e_constraint_mtx[0+(i*constraints_per_time)][1+(i*vars_per_timeblock)] = 1; # 0 -> 1
-  e_constraint_mtx[0+(i*constraints_per_time)][5+(i*vars_per_timeblock)] = 1; # 1 -> 0
+  e_constraint_mtx[0+(i*constraints_per_time)][4+(i*vars_per_timeblock)] = 1; # 1 -> 0
   e_constraint_mtx[1+(i*constraints_per_time)][2+(i*vars_per_timeblock)] = 1; # 0 -> 2
   e_constraint_mtx[1+(i*constraints_per_time)][8+(i*vars_per_timeblock)] = 1; # 2 -> 0
   e_constraint_mtx[2+(i*constraints_per_time)][3+(i*vars_per_timeblock)] = 1; # 0 -> 3
