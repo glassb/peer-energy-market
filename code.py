@@ -89,9 +89,18 @@ big_W_inv = np.linalg.inv(big_W)
 
 big_W_inv_T = np.transpose(big_W_inv)
 
+# divide voltages by V_b
+v_base = 10000  #V
+# divide powers by S_b
+s_base = 1000   #W
+# divide impedances by Z_b
+z_base = (v_base * v_base)/s_base  #kOhms
+
 # values adopted from paper 43 referenced in Ullah and Park. Units in ohms.
-F_r = np.diag([1.3509, 1.17024, 0.84111])
-F_x = np.diag([1.32349, 1.14464, 0.82271])
+
+F_r = np.diag([1.3509/z_base, 1.17024/z_base, 0.84111/z_base])                      
+F_x = np.diag([1.32349/z_base, 1.14464/z_base, 0.82271/z_base])           
+
 
 q_constant = np.array([[2],
                        [2],
@@ -102,17 +111,20 @@ R_matrix = np.matmul(np.matmul(big_W_inv, F_r), big_W_inv_T)                    
 v_bar = np.matmul(big_W_inv, -1*little_wbar) + np.matmul(np.matmul(np.matmul(big_W_inv, F_x), big_W_inv_T), q_constant)        #3x1
 
 R_matrix_4_timesteps = linearalgebra.block_diag(R_matrix,R_matrix,R_matrix,R_matrix)                                          #12x12
-#v_bar_4_timesteps = np.vstack((v_bar,v_bar,v_bar,v_bar))                                                                      #12x1
+v_bar_4_timesteps = np.vstack((v_bar,v_bar,v_bar,v_bar))                                                                      #12x1
+
 
 # upper and lower bounds
-#v_max = [1.05,1.05,1.05,1.05,1.05,1.05,1.05,1.05,1.05,1.05,1.05,1.05]
-#v_min = [0.95,0.95,0.95,0.95,0.95,0.95,0.95,0.95,0.95,0.95,0.95,0.95]
+v_max_squared = 1.05*1.05
+v_min_squared = 0.95*0.95
+v_max = np.array([[v_max_squared],[v_max_squared],[v_max_squared],[v_max_squared],[v_max_squared],[v_max_squared],[v_max_squared],[v_max_squared],[v_max_squared],[v_max_squared],[v_max_squared],[v_max_squared]])
+v_min = np.array([[v_min_squared],[v_min_squared],[v_min_squared],[v_min_squared],[v_min_squared],[v_min_squared],[v_min_squared],[v_min_squared],[v_min_squared],[v_min_squared],[v_min_squared],[v_min_squared]])
 
-# v_bar_4_timesteps_n = [8.94094, 13.5195, 15.16492, 8.94094, 13.5195, 15.16492, 8.94094, 13.5195, 15.16492, 8.94094, 13.5195, 15.16492]
+#v_bar_4_timesteps_n = np.array([[8.94094], [13.5195], [15.16492], [8.94094], [13.5195], [15.16492], [8.94094], [13.5195], [15.16492], [8.94094], [13.5195], [15.16492]])
 
 #                                                                    12x12                           12x64   64x1              12x1                12x1
-#constraint_19c_min =  {'type':'ineq','fun': lambda x: (np.matmul(R_matrix_4_timesteps, np.matmul(sum_pij_4_timesteps,x)) + v_bar_4_timesteps) - v_min}
-#constraint_19c_max =  {'type':'ineq','fun': lambda x: v_max - (np.matmul(R_matrix_4_timesteps,np.matmul(sum_pij_4_timesteps,x)) + v_bar_4_timesteps)}
+constraint_19c_min =  {'type':'ineq','fun': lambda x: np.matmul(R_matrix_4_timesteps,np.matmul(sum_pij_4_timesteps,x)) + np.ndarray.flatten(v_bar_4_timesteps - v_min)}
+constraint_19c_max =  {'type':'ineq','fun': lambda x: np.ndarray.flatten(v_max - v_bar_4_timesteps) - (np.matmul(R_matrix_4_timesteps,np.matmul(sum_pij_4_timesteps,x)))}
 
 # --------------------------------------translate nparray into a list
 # this translates a nparray into a list. Seems as though the optimizer wants all data types in an given constraint to be of a particular type.
@@ -123,7 +135,7 @@ R_matrix_4_timesteps = linearalgebra.block_diag(R_matrix,R_matrix,R_matrix,R_mat
 # https://numpy.org/doc/2.2/reference/generated/numpy.ndarray.flatten.html
 # https://numpy.org/doc/2.2/reference/generated/numpy.ndarray.tolist.html
 # https://docs.python.org/3/tutorial/datastructures.html
-
+''' Not used here, the flattening works above
 v_bar_list = v_bar.flatten(order='C').tolist()
 
 # v_max - v_bar
@@ -137,10 +149,11 @@ v_bar_minus_v_min_4_timesteps = []
 for t in range(4):
     for i in v_bar_list:
         v_bar_minus_v_min_4_timesteps.append(i-0.95)
+        '''
 # --------------------------------------translate nparray into a list
 
-constraint_19c_min =  {'type':'ineq','fun': lambda x: np.matmul(R_matrix_4_timesteps, np.matmul(sum_pij_4_timesteps,x)) + v_bar_minus_v_min_4_timesteps}
-constraint_19c_max =  {'type':'ineq','fun': lambda x: v_max_minus_v_bar_4_timesteps - np.matmul(R_matrix_4_timesteps,np.matmul(sum_pij_4_timesteps,x))}
+#constraint_19c_min =  {'type':'ineq','fun': lambda x: np.matmul(R_matrix_4_timesteps, np.matmul(sum_pij_4_timesteps,x)) + v_bar_minus_v_min_4_timesteps}
+#constraint_19c_max =  {'type':'ineq','fun': lambda x: v_max_minus_v_bar_4_timesteps - np.matmul(R_matrix_4_timesteps,np.matmul(sum_pij_4_timesteps,x))}
 
 #Ben update
 # ---------------------------------- f: POWER FLOW CONSTRAINTS
