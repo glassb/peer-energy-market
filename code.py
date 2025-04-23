@@ -227,7 +227,6 @@ for i in range(timeblocks_no):
 #create a matrix that is a 3x12, which will sum the power injected to each battery.
 totalbattpower = np.identity((nodecount - 1))
 totalbattpower = np.hstack((totalbattpower, totalbattpower, totalbattpower, totalbattpower))
-print(totalbattpower)
 
 #These values are the prosumer bid pricing coefficients for prosumer i
 quadratic_coefficients = [.1, .2, .3, .4]
@@ -270,7 +269,7 @@ constraint = (
               constraint_19b_max,
 
               # (19c) constraints: Voltage Constraints
-              #constraint_19c_min,
+              constraint_19c_min,
               #constraint_19c_max,
             
               # (19d) constraints
@@ -290,11 +289,10 @@ constraint = (
               #Charge State Max
               {'type':'ineq','fun': lambda x: np.ndarray.flatten(batt_max_e_t - batt_initial_t) + (np.matmul(energyadded, np.matmul(sumj_Pijt, x) - np.ndarray.flatten(scheduledload)) * timestep)},
               #Final Charge State, return to where it started
-              {'type':'eq','fun': lambda x: np.matmul(totalbattpower, (np.matmul(sumj_Pijt, x) + np.ndarray.flatten(scheduledload)))},
+              #{'type':'eq','fun': lambda x: np.matmul(totalbattpower, (np.matmul(sumj_Pijt, x) + np.ndarray.flatten(scheduledload)))},
 
               )
 
-print(sumj_Pijt)
 # cost function formulation: this can be quadratic or linear
 '''
 consumer charge is form ax^2 + bx where a and b are coefficients chosen by the consumer
