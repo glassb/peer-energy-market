@@ -175,8 +175,8 @@ W_inv_T_4_timesteps = linearalgebra.block_diag(W_inv_T,W_inv_T,W_inv_T,W_inv_T)
 #calculate A matrix for constraint: lb <= Ax <= ub
 f_matrix = np.matmul(W_inv_T_4_timesteps,nodal_power_transform_4_timesteps)
 
-#upper/lower bounds
-fmax = [10,10,10,10,10,10,10,10,10,10,10,10]
+#upper/lower bounds in p.u.
+fmax = [1,1,1,1,1,1,1,1,1,1,1,1]
 fmin = [0,0,0,0,0,0,0,0,0,0,0,0]
 
 
@@ -338,5 +338,5 @@ results = opt.minimize(fun=cost_function, args=(quadratic_coefficients, linear_c
 
 # printing the output
 for i in range(64):
-  print(timesteps[i // 16],'--',decision_variables[i % 16],':  ',np.round(results.x[i],2),'kW')
+  print(timesteps[i // 16],'--',decision_variables[i % 16],':  ',np.round(results.x[i],2),'per unit')
 
