@@ -44,9 +44,9 @@ vars_per_timeblock = 16
 nodecount = 4
 timestep = 4 #duration in hours
 
-#load scheduled for node i at time t (i=1 t=0, i=2 t=0, i=3 t=0, i=1 t=1, i=2 t=1.....), a negative load is generation
+#injection schedule for node i at time t (i=1 t=0, i=2 t=0, i=3 t=0, i=1 t=1, i=2 t=1.....), a negative injection is load, positive is generation
 #Slack bus NOT included!!!
-scheduledload = np.array([[-2], [0], [1], [3], [5], [4], [-6], [-4], [-3], [0], [-2], [1]])
+scheduledinjection = np.array([[-2], [0], [1], [3], [5], [4], [-6], [-4], [-3], [0], [-2], [1]])
 
 initial_guess = np.tile(np.zeros(vars_per_timeblock),timeblocks_no)
 
@@ -60,13 +60,6 @@ bounds = []
 
 # ---------------------------------- b: HARDWARE POWER CONSTRAINTS
 # x is a vector of 16*4 variables
-
-# Incidence matrix so that sum_pij * x(optimization variables) = P_b + P_i
-sum_pij = np.array([[0,0,0,0,1,1,1,1,0,0,0,0,0,0,0,0],
-                    [0,0,0,0,0,0,0,0,1,1,1,1,0,0,0,0],
-                    [0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1]])
-
-sum_pij_4_timesteps = linearalgebra.block_diag(sum_pij,sum_pij,sum_pij,sum_pij)
 
 # might need to play around with these values
 hardware_p_min = [-8, -8, -8, -8, -8, -8, -8, -8, -8, -8, -8, -8]
@@ -97,8 +90,8 @@ big_W_inv = np.linalg.inv(big_W)
 big_W_inv_T = np.transpose(big_W_inv)
 
 # values adopted from paper 43 referenced in Ullah and Park. Units in ohms.
-F_r = np.diag([1.3509, 1.17024, 0.84111])                      
-F_x = np.diag([1.32349, 1.14464, 0.82271])          
+F_r = np.diag([1.3509, 1.17024, 0.84111])
+F_x = np.diag([1.32349, 1.14464, 0.82271])
 
 q_constant = np.array([[2],
                        [2],
@@ -179,6 +172,14 @@ f_matrix = np.matmul(W_inv_T_4_timesteps,nodal_power_transform_4_timesteps)
 fmax = [1,1,1,1,1,1,1,1,1,1,1,1]
 fmin = [0,0,0,0,0,0,0,0,0,0,0,0]
 
+#Battery Constraints
+
+# Incidence matrix so that sum_pij * x(optimization variables) = P_b + P_i
+sum_pij = np.array([[0,0,0,0,1,1,1,1,0,0,0,0,0,0,0,0],
+                    [0,0,0,0,0,0,0,0,1,1,1,1,0,0,0,0],
+                    [0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1]])
+
+sum_pij_4_timesteps = linearalgebra.block_diag(sum_pij,sum_pij,sum_pij,sum_pij)
 
 #Start each battery with 50kWh, all have the same hardware settings
 #Slack has no battery constraints, and no battery! These are indexed beginning at node 1
@@ -270,7 +271,7 @@ constraint = (
 
               # (19c) constraints: Voltage Constraints
               constraint_19c_min,
-              #constraint_19c_max,
+              constraint_19c_max,
             
               # (19d) constraints
               {'type':'ineq','fun': lambda x: fmax - np.matmul(f_matrix,x)},
@@ -281,15 +282,15 @@ constraint = (
 
               #Battery Constraints
               #Power Min
-              {'type':'ineq','fun': lambda x: np.matmul(sumj_Pijt, x) - np.ndarray.flatten(scheduledload + batt_min_p_t)},
+              {'type':'ineq','fun': lambda x: np.matmul(sumj_Pijt, x) - np.ndarray.flatten(scheduledinjection + batt_min_p_t)},
               #Power Max
-              {'type':'ineq','fun': lambda x: np.ndarray.flatten(scheduledload + batt_max_e_t) - np.matmul(sumj_Pijt, x)},
+              {'type':'ineq','fun': lambda x: np.ndarray.flatten(scheduledinjection + batt_max_e_t) - np.matmul(sumj_Pijt, x)},
               #Charge State Min
-              {'type':'ineq','fun': lambda x: np.ndarray.flatten(batt_initial_t - batt_min_e_t) - (np.matmul(energyadded, np.matmul(sumj_Pijt, x) - np.ndarray.flatten(scheduledload)) * timestep)},
+              {'type':'ineq','fun': lambda x: np.ndarray.flatten(batt_initial_t - batt_min_e_t) - (np.matmul(energyadded, np.matmul(sumj_Pijt, x) - np.ndarray.flatten(scheduledinjection)) * timestep)},
               #Charge State Max
-              {'type':'ineq','fun': lambda x: np.ndarray.flatten(batt_max_e_t - batt_initial_t) + (np.matmul(energyadded, np.matmul(sumj_Pijt, x) - np.ndarray.flatten(scheduledload)) * timestep)},
+              {'type':'ineq','fun': lambda x: np.ndarray.flatten(batt_max_e_t - batt_initial_t) + (np.matmul(energyadded, np.matmul(sumj_Pijt, x) - np.ndarray.flatten(scheduledinjection)) * timestep)},
               #Final Charge State, return to where it started
-              #{'type':'eq','fun': lambda x: np.matmul(totalbattpower, (np.matmul(sumj_Pijt, x) + np.ndarray.flatten(scheduledload)))},
+              {'type':'eq','fun': lambda x: np.matmul(totalbattpower, (np.matmul(sumj_Pijt, x) - np.ndarray.flatten(scheduledload)))},
 
               )
 
