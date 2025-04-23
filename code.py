@@ -64,8 +64,8 @@ sum_pij = np.array([[0,0,0,0,1,1,1,1,0,0,0,0,0,0,0,0],
 sum_pij_4_timesteps = linearalgebra.block_diag(sum_pij,sum_pij,sum_pij,sum_pij)
 
 # might need to play around with these values
-hardware_p_max = [2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2]
-hardware_p_min = [8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8]
+hardware_p_max = [8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8]
+hardware_p_min = [-8, -8, -8, -8, -8, -8, -8, -8, -8, -8, -8, -8]
 
 # all the input arrays must have same number of dimensions, but the array at index 0 has 1 dimension(s) and the array at index 1 has 2 dimension(s)
 
@@ -91,9 +91,16 @@ big_W_inv = np.linalg.inv(big_W)
 
 big_W_inv_T = np.transpose(big_W_inv)
 
+# divide voltages by V_b
+v_base = 10000  #kw
+# divide powers by S_b
+s_base = 1000   #w
+# divide impedances by Z_b
+z_base = (v_base * v_base)/s_base  #kOhms
+
 # values adopted from paper 43 referenced in Ullah and Park. Units in ohms.
-F_r = np.diag([1.3509, 1.17024, 0.84111])                      
-F_x = np.diag([1.32349, 1.14464, 0.82271])          
+F_r = np.diag([1.3509/z_base, 1.17024/z_base, 0.84111/z_base])                      
+F_x = np.diag([1.32349/z_base, 1.14464/z_base, 0.82271/z_base])           
 
 q_constant = np.array([[2],
                        [2],
@@ -108,8 +115,10 @@ v_bar_4_timesteps = np.vstack((v_bar,v_bar,v_bar,v_bar))                        
 
 
 # upper and lower bounds
-v_max = np.array([[1.05],[1.05],[1.05],[1.05],[1.05],[1.05],[1.05],[1.05],[1.05],[1.05],[1.05],[1.05]])
-v_min = np.array([[0.95],[0.95],[0.95],[0.95],[0.95],[0.95],[0.95],[0.95],[0.95],[0.95],[0.95],[0.95]])
+v_max_squared = 1.05*1.05
+v_min_squared = 0.95*0.95
+v_max = np.array([[v_max_squared],[v_max_squared],[v_max_squared],[v_max_squared],[v_max_squared],[v_max_squared],[v_max_squared],[v_max_squared],[v_max_squared],[v_max_squared],[v_max_squared],[v_max_squared]])
+v_min = np.array([[v_min_squared],[v_min_squared],[v_min_squared],[v_min_squared],[v_min_squared],[v_min_squared],[v_min_squared],[v_min_squared],[v_min_squared],[v_min_squared],[v_min_squared],[v_min_squared]])
 
 #v_bar_4_timesteps_n = np.array([[8.94094], [13.5195], [15.16492], [8.94094], [13.5195], [15.16492], [8.94094], [13.5195], [15.16492], [8.94094], [13.5195], [15.16492]])
 
