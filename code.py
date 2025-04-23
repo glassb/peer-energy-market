@@ -79,7 +79,6 @@ fmax = [10,10,10,10,10,10,10,10,10,10,10,10]
 fmin = [0,0,0,0,0,0,0,0,0,0,0,0]
 
 
-#Ryan Update
 #Start each battery with 50kWh, all have the same hardware settings
 batt_initial = [50, 50, 50, 50]
 batt_min_e = [20, 20, 20, 20]
@@ -92,7 +91,6 @@ batt_max_p = [10, 10, 10, 10]
 quadratic_coefficients = [.1, .2, .3, .4]
 linear_coefficients = [5, 6, 7, 8]
 
-#Ryan Update
 #(19e) constraint matrix
 constraints_per_time = 10
 e_constraint_mtx = np.zeros((constraints_per_time * timeblocks_no, vars_per_timeblock * timeblocks_no))
