@@ -69,8 +69,8 @@ sum_pij = np.array([[0,0,0,0,1,1,1,1,0,0,0,0,0,0,0,0],
 sum_pij_4_timesteps = linearalgebra.block_diag(sum_pij,sum_pij,sum_pij,sum_pij)
 
 # might need to play around with these values
-hardware_p_max = [2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2]
-hardware_p_min = [8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8]
+hardware_p_min = [-8, -8, -8, -8, -8, -8, -8, -8, -8, -8, -8, -8]
+hardware_p_max = [8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8]
 
 # all the input arrays must have same number of dimensions, but the array at index 0 has 1 dimension(s) and the array at index 1 has 2 dimension(s)
 
@@ -227,6 +227,7 @@ for i in range(timeblocks_no):
 #create a matrix that is a 3x12, which will sum the power injected to each battery.
 totalbattpower = np.identity((nodecount - 1))
 totalbattpower = np.hstack((totalbattpower, totalbattpower, totalbattpower, totalbattpower))
+print(totalbattpower)
 
 #These values are the prosumer bid pricing coefficients for prosumer i
 quadratic_coefficients = [.1, .2, .3, .4]
@@ -240,7 +241,7 @@ for i in range(timeblocks_no): #this loop iterates through time blocks
 
   #Trade Balance, power sent = power received from i to j
   e_constraint_mtx[0+(i*constraints_per_time)][1+(i*vars_per_timeblock)] = 1; # 0 -> 1
-  e_constraint_mtx[0+(i*constraints_per_time)][5+(i*vars_per_timeblock)] = 1; # 1 -> 0
+  e_constraint_mtx[0+(i*constraints_per_time)][4+(i*vars_per_timeblock)] = 1; # 1 -> 0
   e_constraint_mtx[1+(i*constraints_per_time)][2+(i*vars_per_timeblock)] = 1; # 0 -> 2
   e_constraint_mtx[1+(i*constraints_per_time)][8+(i*vars_per_timeblock)] = 1; # 2 -> 0
   e_constraint_mtx[2+(i*constraints_per_time)][3+(i*vars_per_timeblock)] = 1; # 0 -> 3
@@ -264,14 +265,13 @@ for i in range(timeblocks_no): #this loop iterates through time blocks
 # ---------------------------------- CONSTRAINTS
 
 constraint = (
-
               # (19b) constraints: Harware Power Constraints
               constraint_19b_min,
               constraint_19b_max,
 
               # (19c) constraints: Voltage Constraints
-              constraint_19c_min,
-              constraint_19c_max,
+              #constraint_19c_min,
+              #constraint_19c_max,
             
               # (19d) constraints
               {'type':'ineq','fun': lambda x: fmax - np.matmul(f_matrix,x)},
@@ -290,13 +290,11 @@ constraint = (
               #Charge State Max
               {'type':'ineq','fun': lambda x: np.ndarray.flatten(batt_max_e_t - batt_initial_t) + (np.matmul(energyadded, np.matmul(sumj_Pijt, x) - np.ndarray.flatten(scheduledload)) * timestep)},
               #Final Charge State, return to where it started
-              {'type':'eq','fun': lambda x: np.matmul(totalbattpower, np.matmul(sumj_Pijt, x) - np.ndarray.flatten(scheduledload))},
-
-              #{'type':'eq','fun': lambda x: x[35]+x[38]}
+              {'type':'eq','fun': lambda x: np.matmul(totalbattpower, (np.matmul(sumj_Pijt, x) + np.ndarray.flatten(scheduledload)))},
 
               )
 
-
+print(sumj_Pijt)
 # cost function formulation: this can be quadratic or linear
 '''
 consumer charge is form ax^2 + bx where a and b are coefficients chosen by the consumer
@@ -335,6 +333,15 @@ def cost_function(x, quad_coefficients, lin_coefficients):
 # return results of optimization problem
 results = opt.minimize(fun=cost_function, args=(quadratic_coefficients, linear_coefficients),x0=initial_guess,constraints=constraint)
 
+#Status:
+  #0 = optimal solution found
+  #1 = iteration limit reached
+  #2 = infeasible
+  #3 = unbounded
+  #6 = ill-conditioned matrix
+  #8 = did not converge in iteration limit
+  #9 = failed, can't make further progress
+print(results.status)
 
 # printing the output
 for i in range(64):
