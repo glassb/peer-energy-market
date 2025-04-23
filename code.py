@@ -25,8 +25,8 @@ from scipy import linalg as linearalgebra
 
 
 '''
-Decision Variables Index: [24 energy trades + 8 Battery vars]
-[00 01 02 03 10 11 12 13 20 21 22 23 30 31 32 33 B0p B0e B1p B1e B2p B2e B3p B3e]
+Decision Variables Index: [24 energy trades]
+[00 01 02 03 10 11 12 13 20 21 22 23 30 31 32 33]
 
 
 00 01 02 03
@@ -52,6 +52,102 @@ initial_guess = np.tile(np.zeros(vars_per_timeblock),timeblocks_no)
 
 #we can set individual bounds for any of the decision variables
 bounds = []
+# ---------------------------------- General Variables
+
+
+
+
+
+# ---------------------------------- b: HARDWARE POWER CONSTRAINTS
+# x is a vector of 16*4 variables
+
+# Incidence matrix so that sum_pij * x(optimization variables) = P_b + P_i
+sum_pij = np.array([[0,0,0,0,1,1,1,1,0,0,0,0,0,0,0,0],
+                    [0,0,0,0,0,0,0,0,1,1,1,1,0,0,0,0],
+                    [0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1]])
+
+sum_pij_4_timesteps = linearalgebra.block_diag(sum_pij,sum_pij,sum_pij,sum_pij)
+
+# might need to play around with these values
+hardware_p_max = [2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2]
+hardware_p_min = [8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8]
+
+# all the input arrays must have same number of dimensions, but the array at index 0 has 1 dimension(s) and the array at index 1 has 2 dimension(s)
+
+constraint_19b_min =  {'type':'ineq','fun': lambda x: np.matmul(sum_pij_4_timesteps, x) - hardware_p_min}
+constraint_19b_max =  {'type':'ineq','fun': lambda x: hardware_p_max - np.matmul(sum_pij_4_timesteps, x)}
+
+# ---------------------------------- c: VOLTAGE CONSTRAINTS
+
+# make R matrix and v bar
+big_Wbar = np.array([[1,-1,0,0],      # 0 -> 1
+                     [0,1,-1,0],      # 1 -> 2
+                     [0,0,1,-1]])     # 2 -> 3
+
+big_W = np.array([big_Wbar[0][1:],
+                  big_Wbar[1][1:],
+                  big_Wbar[2][1:]])
+
+little_wbar = np.array([[big_Wbar[0][0]],
+                        [big_Wbar[1][0]],
+                        [big_Wbar[2][0]]])
+
+big_W_inv = np.linalg.inv(big_W)
+
+big_W_inv_T = np.transpose(big_W_inv)
+
+# values adopted from paper 43 referenced in Ullah and Park. Units in ohms.
+F_r = np.diag([1.3509, 1.17024, 0.84111])                      
+F_x = np.diag([1.32349, 1.14464, 0.82271])          
+
+q_constant = np.array([[2],
+                       [2],
+                       [2]])
+
+# v = (R_matrix * sum_pij * x) + v_bar
+R_matrix = np.matmul(np.matmul(big_W_inv, F_r), big_W_inv_T)                                                                   #3x3
+v_bar = np.matmul(big_W_inv, -1*little_wbar) + np.matmul(np.matmul(np.matmul(big_W_inv, F_x), big_W_inv_T), q_constant)        #3x1
+
+R_matrix_4_timesteps = linearalgebra.block_diag(R_matrix,R_matrix,R_matrix,R_matrix)                                          #12x12
+#v_bar_4_timesteps = np.vstack((v_bar,v_bar,v_bar,v_bar))                                                                      #12x1
+
+# upper and lower bounds
+#v_max = [1.05,1.05,1.05,1.05,1.05,1.05,1.05,1.05,1.05,1.05,1.05,1.05]
+#v_min = [0.95,0.95,0.95,0.95,0.95,0.95,0.95,0.95,0.95,0.95,0.95,0.95]
+
+# v_bar_4_timesteps_n = [8.94094, 13.5195, 15.16492, 8.94094, 13.5195, 15.16492, 8.94094, 13.5195, 15.16492, 8.94094, 13.5195, 15.16492]
+
+#                                                                    12x12                           12x64   64x1              12x1                12x1
+#constraint_19c_min =  {'type':'ineq','fun': lambda x: (np.matmul(R_matrix_4_timesteps, np.matmul(sum_pij_4_timesteps,x)) + v_bar_4_timesteps) - v_min}
+#constraint_19c_max =  {'type':'ineq','fun': lambda x: v_max - (np.matmul(R_matrix_4_timesteps,np.matmul(sum_pij_4_timesteps,x)) + v_bar_4_timesteps)}
+
+# --------------------------------------translate nparray into a list
+# this translates a nparray into a list. Seems as though the optimizer wants all data types in an given constraint to be of a particular type.
+# when 19c max is not commented out
+# constraint_19c_max =  {'type':'ineq','fun': lambda x: v_max - (np.matmul(R_matrix_4_timesteps,np.matmul(sum_pij_4_timesteps,x)))}
+# removed v_bar_4_timesteps which is a np.array of 12x1. I think it needs to be one dimension. similar to v_max. below is code that does this.
+
+# https://numpy.org/doc/2.2/reference/generated/numpy.ndarray.flatten.html
+# https://numpy.org/doc/2.2/reference/generated/numpy.ndarray.tolist.html
+# https://docs.python.org/3/tutorial/datastructures.html
+
+v_bar_list = v_bar.flatten(order='C').tolist()
+
+# v_max - v_bar
+v_max_minus_v_bar_4_timesteps = []
+for t in range(4):
+    for i in v_bar_list:
+        v_max_minus_v_bar_4_timesteps.append(1.05-i)
+
+# v_bar - v_min
+v_bar_minus_v_min_4_timesteps = []
+for t in range(4):
+    for i in v_bar_list:
+        v_bar_minus_v_min_4_timesteps.append(i-0.95)
+# --------------------------------------translate nparray into a list
+
+constraint_19c_min =  {'type':'ineq','fun': lambda x: np.matmul(R_matrix_4_timesteps, np.matmul(sum_pij_4_timesteps,x)) + v_bar_minus_v_min_4_timesteps}
+constraint_19c_max =  {'type':'ineq','fun': lambda x: v_max_minus_v_bar_4_timesteps - np.matmul(R_matrix_4_timesteps,np.matmul(sum_pij_4_timesteps,x))}
 
 #Ben update
 # ---------------------------------- f: POWER FLOW CONSTRAINTS
@@ -168,6 +264,15 @@ for i in range(timeblocks_no): #this loop iterates through time blocks
 # ---------------------------------- CONSTRAINTS
 
 constraint = (
+
+              # (19b) constraints: Harware Power Constraints
+              constraint_19b_min,
+              constraint_19b_max,
+
+              # (19c) constraints: Voltage Constraints
+              constraint_19c_min,
+              constraint_19c_max,
+            
               # (19d) constraints
               {'type':'ineq','fun': lambda x: fmax - np.matmul(f_matrix,x)},
               {'type':'ineq','fun': lambda x: np.multiply(-1,fmin) + np.matmul(f_matrix,x)},
