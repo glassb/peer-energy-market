@@ -185,8 +185,8 @@ W_inv_T_4_timesteps = linearalgebra.block_diag(W_inv_T,W_inv_T,W_inv_T,W_inv_T)
 f_matrix = np.matmul(W_inv_T_4_timesteps,nodal_power_transform_4_timesteps)
 
 #upper/lower bounds in p.u.
-fmax = [1,1,1,1,1,1,1,1,1,1,1,1]
-fmin = [0,0,0,0,0,0,0,0,0,0,0,0]
+fmax = np.multiply(15,[1,1,1,1,1,1,1,1,1,1,1,1])
+fmin = np.multiply(15,[-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1])
 
 #Battery Constraints
 
@@ -292,8 +292,8 @@ constraint = (
 
       #Something about 19D needs to be reworked, these constraints cause it to fail
               # (19d) constraints
-              #{'type':'ineq','fun': lambda x: fmax - np.matmul(f_matrix,x)},
-              #{'type':'ineq','fun': lambda x: np.multiply(-1,fmin) + np.matmul(f_matrix,x)},
+              {'type':'ineq','fun': lambda x: fmax - np.matmul(f_matrix,x)},
+              {'type':'ineq','fun': lambda x: np.multiply(-1,fmin) + np.matmul(f_matrix,x)},
 
               # (19e) constraints
               {'type':'eq','fun': lambda x: np.matmul(e_constraint_mtx, x)},  #do all at once, timesteps now included
