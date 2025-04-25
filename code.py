@@ -302,7 +302,7 @@ constraint = (
               #Power Min
               {'type':'ineq','fun': lambda x: np.matmul(sumj_Pijt, x) - np.ndarray.flatten(scheduledinjection + batt_min_p_t)},
               #Power Max
-              {'type':'ineq','fun': lambda x: np.ndarray.flatten(scheduledinjection + batt_max_e_t) - np.matmul(sumj_Pijt, x)},
+              {'type':'ineq','fun': lambda x: np.ndarray.flatten(scheduledinjection + batt_max_p_t) - np.matmul(sumj_Pijt, x)},
               #Charge State Min
               {'type':'ineq','fun': lambda x: np.ndarray.flatten(batt_initial_t - batt_min_e_t) - (np.matmul(energyadded, np.matmul(sumj_Pijt, x) - np.ndarray.flatten(scheduledinjection)) * timestep)},
               #Charge State Max
@@ -357,7 +357,7 @@ for i in range(timeblocks_no):
 print("Initial Guess: ", initial_guess)
 
 # return results of optimization problem
-results = opt.minimize(fun=cost_function, args=(quadratic_coefficients, linear_coefficients),x0=initial_guess,constraints=constraint, options={"maxiter": 100, "ftol": 1e-5, "disp":True}) #can add method="method"
+results = opt.minimize(fun=cost_function,args=(quadratic_coefficients, linear_coefficients),x0=initial_guess,constraints=constraint, options={"maxiter": 100, "ftol": 1e-5, "disp":True}) #can add method="method"
 
 #Status:
   #0 = optimal solution found
@@ -369,7 +369,28 @@ results = opt.minimize(fun=cost_function, args=(quadratic_coefficients, linear_c
   #9 = failed, can't make further progress
 print("Optimization Status: ", results.status)
 
+'''
 # printing the output
 for i in range(64):
   print(timesteps[i // 16],'--',decision_variables[i % 16],':  ',np.round(results.x[i],2),'per unit')
+'''
+
+
+#print(np.round(results.x,4))
+
+transform =           [[0,0,0,0,1,1,1,1,0,0,0,0,0,0,0,0],
+                        [0,0,0,0,0,0,0,0,1,1,1,1,0,0,0,0],
+                        [0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1]]
+
+fourTransform = linearalgebra.block_diag(transform,transform,transform,transform)
+
+print(np.matmul(fourTransform,np.round(results.x,4))-np.transpose(scheduledinjection.flatten()))
+
+
+
+
+
+
+
+
 
