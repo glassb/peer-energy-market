@@ -450,31 +450,38 @@ print("Optimization Status: ", results.status)
 # ts = 2, from node 0 | ts = 3, from node 1 | ts = 3, from node 2 | ts = 3, from node 3 |
 # ts = 3, from node 0 | ts = 4, from node 1 | ts = 4, from node 2 | ts = 4, from node 3 | 
 
-idx = 0
-# data is a 4x4 array which stores the sum_pij
-data = np.zeros((4,4))
-for timestep in range(0,4):
-    for n in range(0,4):
-        for trade in range(0,4):
-            # sum each trade into the array[timestep][node]
-            data[timestep,n] = data[timestep,n] + np.round(results.x[idx],2)
+# Recovering P_injected_battery = Sum_P_ij - P_scheduled_inj
 
-            #debugging code below
+idx = 0
+
+# sum_pij_array is a 4x4 array which stores the sum_pij
+sum_pij_array = np.zeros((4,4))
+for timestep in range(0,4):
+    #print("timestep:", timestep)
+    for n in range(0,4):
+        #print("node:", n)
+        for trade in range(0,4):
+            #print("trade:", trade)
+            # sum each trade into the array[timestep][node]
+            #print("adding ", np.round(results.x[idx],2))
+            sum_pij_array[timestep,n] = sum_pij_array[timestep,n] + np.round(results.x[idx],2)
+            
             #print("_______________________")
-            #print("|", data[0,0],"|",data[0,1],"|",data[0,2],"|",data[0,3],"|")
-            #print("|", data[1,0],"|",data[1,1],"|",data[1,2],"|",data[1,3],"|")
-            #print("|", data[2,0],"|",data[2,1],"|",data[2,2],"|",data[2,3],"|")
-            #print("|", data[3,0],"|",data[3,1],"|",data[3,2],"|",data[3,3],"|")
+            #print("|", sum_pij_array[0,0],"|",sum_pij_array[0,1],"|",sum_pij_array[0,2],"|",sum_pij_array[0,3],"|")
+            #print("|", sum_pij_array[1,0],"|",sum_pij_array[1,1],"|",sum_pij_array[1,2],"|",sum_pij_array[1,3],"|")
+            #print("|", sum_pij_array[2,0],"|",sum_pij_array[2,1],"|",sum_pij_array[2,2],"|",sum_pij_array[2,3],"|")
+            #print("|", sum_pij_array[3,0],"|",sum_pij_array[3,1],"|",sum_pij_array[3,2],"|",sum_pij_array[3,3],"|")
             #print("_______________________")
 
             idx = idx + 1
 
-#injection schedule for node i at time t (i=1 t=0, i=2 t=0, i=3 t=0, i=1 t=1, i=2 t=1.....), a negative injection is load, positive is generation
+#injection schedule for node i at time t (i=1 t=0, i=2 t=0, i=3 t=0, i=1 t=1, i=2 t=1.....), a negative injection is load, positive is generation. Slack bus NOT included!!!
 #scheduledinjection = np.array([[-2], [.5], [1], [3], [5], [4], [-6], [-4], [-3], [-.8], [-2], [1]])
 
-# i'm pretty sure this returns a new object. scheduledinjection seems to still be an column vector
+#put the provided scheduleinjection vector into an array of the same shape of "sum_pij_array" (which holds sum of Pij) 
 p_ij_initial  = np.concatenate((np.zeros((4,1)), np.reshape(scheduledinjection, (4,3))), axis = 1)
 
-# get total amount of energy stored into battery
-b_e = data - p_ij_initial
+# let b_p be sum_pij_array - p_ij_initial 
+b_p = sum_pij_array - p_ij_initial
+b_p
 
