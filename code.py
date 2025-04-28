@@ -182,8 +182,8 @@ W_inv_T_4_timesteps = linearalgebra.block_diag(W_inv_T,W_inv_T,W_inv_T,W_inv_T)
 f_matrix = np.matmul(W_inv_T_4_timesteps,nodal_power_transform_4_timesteps)
 
 #upper/lower bounds in p.u.
-fmax = [1,1,1,1,1,1,1,1,1,1,1,1]
-fmin = [0,0,0,0,0,0,0,0,0,0,0,0]
+fmax = np.multiply(15,[1,1,1,1,1,1,1,1,1,1,1,1])
+fmin = np.multiply(15,[-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1])
 
 #Battery Constraints
 
@@ -290,8 +290,8 @@ constraint = (
 
       #Something about 19D needs to be reworked, these constraints cause it to fail
               # (19d) constraints
-              #{'type':'ineq','fun': lambda x: fmax - np.matmul(f_matrix,x)},
-              #{'type':'ineq','fun': lambda x: np.multiply(-1,fmin) + np.matmul(f_matrix,x)},
+              {'type':'ineq','fun': lambda x: fmax - np.matmul(f_matrix,x)},
+              {'type':'ineq','fun': lambda x: np.multiply(-1,fmin) + np.matmul(f_matrix,x)},
 
               # (19e) constraints
               {'type':'eq','fun': lambda x: np.matmul(e_constraint_mtx, x)},  #do all at once, timesteps now included
@@ -300,7 +300,7 @@ constraint = (
               #Power Min
               {'type':'ineq','fun': lambda x: np.matmul(sumj_Pijt, x) - np.ndarray.flatten(scheduledinjection + batt_min_p_t)},
               #Power Max
-              {'type':'ineq','fun': lambda x: np.ndarray.flatten(scheduledinjection + batt_max_e_t) - np.matmul(sumj_Pijt, x)},
+              {'type':'ineq','fun': lambda x: np.ndarray.flatten(scheduledinjection + batt_max_p_t) - np.matmul(sumj_Pijt, x)},
               #Charge State Min
               {'type':'ineq','fun': lambda x: np.ndarray.flatten(batt_initial_t - batt_min_e_t) - (np.matmul(energyadded, np.matmul(sumj_Pijt, x) - np.ndarray.flatten(scheduledinjection)) * timestep)},
               #Charge State Max
@@ -331,6 +331,8 @@ and b is a vector [b1 b1 b1 b2 b2 b2]
 corresponding to the indices of i. That is, all entries in a and b will be ai and bi for pi
 '''
 
+
+# -------------------------------------------- Cost Function 1
 #These values are the utility service charge prices
 #depend on trade between i to j, because of distances between i and j
 utility_coefficiens = []
@@ -372,9 +374,78 @@ print("No Middlemen, Optimal cost should achieve: ", (slackcost + nodalcost)/2)
 print("Initial Guess: ", initial_guess)
 
 # return results of optimization problem
-results = opt.minimize(fun=cost_function, args=(quadratic_coefficients, linear_coefficients),x0=initial_guess,constraints=constraint, options={"maxiter": 100, "ftol": 1e-6, "disp":True}) #method="COBYQA"]
+results = opt.minimize(fun=cost_function, args=(quadratic_coefficients, linear_coefficients),x0=initial_guess,constraints=constraint, options={"maxiter": 100, "ftol": 1e-6, "disp":True}) #method="COBYQA"
 
 
+
+#Status:
+  #0 = optimal solution found
+  #1 = iteration limit reached
+  #2 = infeasible
+  #3 = unbounded
+  #6 = ill-conditioned matrix
+  #8 = did not converge in iteration limit
+  #9 = failed, can't make further progress
+print("Optimization Status: ", results.status)
+
+'''
+# printing the output
+for i in range(64):
+  print(timesteps[i // 16],'--',decision_variables[i % 16],':  ',np.round(results.x[i],2),'per unit')
+'''
+
+'''
+#print(np.round(results.x,4))
+
+transform =           [[0,0,0,0,1,1,1,1,0,0,0,0,0,0,0,0],
+                        [0,0,0,0,0,0,0,0,1,1,1,1,0,0,0,0],
+                        [0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1]]
+
+fourTransform = linearalgebra.block_diag(transform,transform,transform,transform)
+
+print(np.matmul(fourTransform,np.round(results.x,4))-np.transpose(scheduledinjection.flatten()))
+
+
+
+
+# ---------------------------------------------------------------------- Cost Function 2
+# Kelsey's Version of Cost Function (Incentivizes sending some predetermined amount to slack bus)
+
+# Set target that slack bus would like neighborhood to produce
+P_0_target = np.array([[3],
+                       [3], 
+                       [3], 
+                       [3]])
+P_0_target_t1 = P_0_target[0][0]
+P_0_target_t2 = P_0_target[1][0]
+P_0_target_t3 = P_0_target[2][0]
+P_0_target_t4 = P_0_target[3][0]
+
+# setting up structure/variables for cost function 
+sum_Pi0= np.array([[0,0,0,0,1,0,0,0,1,0,0,0,1,0,0,0]])
+t_off = np.zeros((1,16))
+sum_Pi0_t1_on = np.hstack((sum_Pi0,t_off,t_off,t_off))
+sum_Pi0_t2_on = np.hstack((t_off,sum_Pi0,t_off,t_off))
+sum_Pi0_t3_on = np.hstack((t_off,t_off,sum_Pi0,t_off))
+sum_Pi0_t4_on = np.hstack((t_off,t_off,t_off,sum_Pi0,))
+
+# actual cost function
+def cost_function(x, sum_Pi0_t1_on, sum_Pi0_t2_on, sum_Pi0_t3_on, sum_Pi0_t4_on, P_0_target_t1, P_0_target_t2, P_0_target_t3, P_0_target_t4):
+    return (np.matmul(sum_Pi0_t1_on,x) - P_0_target_t1)**2 + (np.matmul(sum_Pi0_t2_on,x) - P_0_target_t2)**2 + (np.matmul(sum_Pi0_t3_on,x) - P_0_target_t3)**2 + (np.matmul(sum_Pi0_t4_on,x) - P_0_target_t4)**2
+
+#set initial guess for every prosumer to get all their power from the grid
+initial_guess = np.tile(np.zeros(vars_per_timeblock),timeblocks_no)
+for i in range(timeblocks_no):
+  for j in range(nodecount-1):
+    initial_guess[(j + 1)+(i*vars_per_timeblock)] = scheduledinjection[j + (i * (nodecount - 1))][0] * -1
+    initial_guess[((j+1) * nodecount)+(i*vars_per_timeblock)] = scheduledinjection[j+ (i * (nodecount - 1))][0]
+
+print("Initial Guess: ", initial_guess)
+
+# return results of optimization problem
+results = opt.minimize(fun=cost_function,args=(sum_Pi0_t1_on, sum_Pi0_t2_on, sum_Pi0_t3_on, sum_Pi0_t4_on, P_0_target_t1, P_0_target_t2, P_0_target_t3, P_0_target_t4),x0=initial_guess,constraints=constraint, options={"maxiter": 100, "ftol": 1e-5, "disp":True}) #can add method="method"
+
+'''
 #Status:
   #0 = optimal solution found
   #1 = iteration limit reached
@@ -399,4 +470,49 @@ for i in range(64):
 # printing the output
 for i in range(64):
   print(timesteps[i // 16],'--', decision_variables[i % 16],':  ', results.x[i], 'per unit')
+
+
+
+# ----------------------------------------------------- Recovering P_injected_battery = Sum_P_ij - P_scheduled_inj
+
+# This block of code sums all trades from a particular node to all other nodes at timestep t into an array structure like below.
+# ts = 0, from node 0 | ts = 1, from node 1 | ts = 1, from node 2 | ts = 1, from node 3 | 
+# ts = 1, from node 0 | ts = 2, from node 1 | ts = 2, from node 2 | ts = 2, from node 3 | 
+# ts = 2, from node 0 | ts = 3, from node 1 | ts = 3, from node 2 | ts = 3, from node 3 |
+# ts = 3, from node 0 | ts = 4, from node 1 | ts = 4, from node 2 | ts = 4, from node 3 | 
+
+# Recovering P_injected_battery = Sum_P_ij - P_scheduled_inj
+
+idx = 0
+
+# sum_pij_array is a 4x4 array which stores the sum_pij
+sum_pij_array = np.zeros((4,4))
+for timestep in range(0,4):
+    #print("timestep:", timestep)
+    for n in range(0,4):
+        #print("node:", n)
+        for trade in range(0,4):
+            #print("trade:", trade)
+            # sum each trade into the array[timestep][node]
+            #print("adding ", np.round(results.x[idx],2))
+            sum_pij_array[timestep,n] = sum_pij_array[timestep,n] + np.round(results.x[idx],2)
+            
+            #print("_______________________")
+            #print("|", sum_pij_array[0,0],"|",sum_pij_array[0,1],"|",sum_pij_array[0,2],"|",sum_pij_array[0,3],"|")
+            #print("|", sum_pij_array[1,0],"|",sum_pij_array[1,1],"|",sum_pij_array[1,2],"|",sum_pij_array[1,3],"|")
+            #print("|", sum_pij_array[2,0],"|",sum_pij_array[2,1],"|",sum_pij_array[2,2],"|",sum_pij_array[2,3],"|")
+            #print("|", sum_pij_array[3,0],"|",sum_pij_array[3,1],"|",sum_pij_array[3,2],"|",sum_pij_array[3,3],"|")
+            #print("_______________________")
+
+            idx = idx + 1
+
+#injection schedule for node i at time t (i=1 t=0, i=2 t=0, i=3 t=0, i=1 t=1, i=2 t=1.....), a negative injection is load, positive is generation. Slack bus NOT included!!!
+#scheduledinjection = np.array([[-2], [.5], [1], [3], [5], [4], [-6], [-4], [-3], [-.8], [-2], [1]])
+
+#put the provided scheduleinjection vector into an array of the same shape of "sum_pij_array" (which holds sum of Pij) 
+p_ij_initial  = np.concatenate((np.zeros((4,1)), np.reshape(scheduledinjection, (4,3))), axis = 1)
+
+# let b_p be sum_pij_array - p_ij_initial 
+b_p = sum_pij_array - p_ij_initial
+b_p
 
