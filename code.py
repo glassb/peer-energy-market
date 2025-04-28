@@ -369,46 +369,60 @@ for i in range(timeblocks_no):
 
 
 
-'''-------------unused block, used dispay minimum cost without batteries for debugging-------------------
+#-------------unused block, used dispay minimum cost without batteries for debugging-------------------
 pertime_extra = np.matmul(linearalgebra.block_diag(np.ones(3),np.ones(3), np.ones(3), np.ones(3)), scheduledinjection)
 slackcost = np.matmul(np.ones(4), np.abs(pertime_extra))
 nodalcost = np.matmul(np.ones(12), np.abs(scheduledinjection))
 print("No Middlemen, Optimal cost should achieve: ", (slackcost + nodalcost)/2)
-'''
+
 
 
 
 # ---------------------------------------------------------------------- Cost Function 2
 # Kelsey's Version of Cost Function (Incentivizes sending some predetermined amount to slack bus)
 
-# Set target that slack bus would like neighborhood to produce
+# Set target injection that slack bus would like to achieve
 P_0_target = np.array([[3],
                        [3], 
                        [3], 
                        [3]])
+'''
 P_0_target_t1 = P_0_target[0][0]
 P_0_target_t2 = P_0_target[1][0]
 P_0_target_t3 = P_0_target[2][0]
 P_0_target_t4 = P_0_target[3][0]
+'''
 
-# setting up structure/variables for cost function 
-sum_Pi0= np.array([[0,0,0,0,1,0,0,0,1,0,0,0,1,0,0,0]])
+
+
+'''
 t_off = np.zeros((1,16))
 sum_Pi0_t1_on = np.hstack((sum_Pi0,t_off,t_off,t_off))
 sum_Pi0_t2_on = np.hstack((t_off,sum_Pi0,t_off,t_off))
 sum_Pi0_t3_on = np.hstack((t_off,t_off,sum_Pi0,t_off))
 sum_Pi0_t4_on = np.hstack((t_off,t_off,t_off,sum_Pi0,))
-
+'''
 
 
 #----------------------------------------------------- COST FUNCTION -----------------------------------------------
 # actual cost function
-def cost_function(x, sum_Pi0_t1_on, sum_Pi0_t2_on, sum_Pi0_t3_on, sum_Pi0_t4_on, P_0_target_t1, P_0_target_t2, P_0_target_t3, P_0_target_t4):
-  return (np.matmul(sum_Pi0_t1_on,x) - P_0_target_t1)**2 + (np.matmul(sum_Pi0_t2_on,x) - P_0_target_t2)**2 + (np.matmul(sum_Pi0_t3_on,x) - P_0_target_t3)**2 + (np.matmul(sum_Pi0_t4_on,x) - P_0_target_t4)**2
+def cost_function(x, P_0_target):
 
-  #second term here represents middleman trading restriction
+  #Kelsey's P0 Target Injection
+  # setting up structure/variables for cost function
+  sum_P0j = np.array([0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0])
+  sum_P0jt = linearalgebra.block_diag(sum_P0j, sum_P0j, sum_P0j, sum_P0j)
+
+  P0_targetdiff = np.matmul(sum_P0jt, x) - np.ndarray.flatten(P_0_target)
+  P0_target_penalty = (np.matmul(np.transpose(P0_targetdiff), P0_targetdiff))
+
+
+  #Ryan's middleman restriction
   #Sums all the outgoing (positive) trades. This is convex because max is convex. If there is a middleman trade, the outgoing trade from origin to destination is duplicated as a middleman outgoing
-  return np.matmul(np.ones(64), np.maximum(np.zeros(64), x))
+  middleman_penalty = np.matmul(np.ones(64), np.maximum(np.zeros(64), x))
+  print(middleman_penalty)
+  return middleman_penalty + P0_target_penalty
+
 #--------------------------------------------------------------------------------------------------------------------
 
 
@@ -425,7 +439,7 @@ print("Initial Guess: ", initial_guess)
 
 
 # return results of optimization problem
-results = opt.minimize(fun=cost_function,args=(sum_Pi0_t1_on, sum_Pi0_t2_on, sum_Pi0_t3_on, sum_Pi0_t4_on, P_0_target_t1, P_0_target_t2, P_0_target_t3, P_0_target_t4),x0=initial_guess,constraints=constraint, options={"maxiter": 100, "ftol": 1e-5, "disp":True}) #can add method="method"
+results = opt.minimize(fun=cost_function,args=(P_0_target),x0=initial_guess,constraints=constraint, options={"maxiter": 100, "ftol": 1e-5, "disp":True}) #can add method="method"
 
 
 #Status:
