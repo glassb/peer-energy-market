@@ -420,7 +420,6 @@ def cost_function(x, P_0_target):
   #Ryan's middleman restriction
   #Sums all the outgoing (positive) trades. This is convex because max is convex. If there is a middleman trade, the outgoing trade from origin to destination is duplicated as a middleman outgoing
   middleman_penalty = np.matmul(np.ones(64), np.maximum(np.zeros(64), x))
-  print(middleman_penalty)
   return middleman_penalty + P0_target_penalty
 
 #--------------------------------------------------------------------------------------------------------------------
