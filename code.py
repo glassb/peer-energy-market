@@ -204,7 +204,7 @@ sum_pij_4_timesteps = linearalgebra.block_diag(sum_pij,sum_pij,sum_pij,sum_pij)
 
 #Start each battery with 50kWh, all have the same hardware settings
 #Slack has no battery constraints, and no battery! These are indexed beginning at node 1
-batt_initial = np.array([[80], [80], [80]])
+batt_initial = np.array([[6], [12], [11]])
 batt_min_e = np.array([[2], [10], [4]]) #user set minimum charge state
 batt_max_e = np.array([[12], [12], [22]]) #user set maximum charge state (powerwall is 13.5, user 3 has two powerwall batteries)
 batt_min_p = np.array([[-7.5], [-7.5], [-7.5]]) #40A breaker 240V, at 80% capacity
@@ -336,7 +336,7 @@ To get in the cost function form we will see (x)T*A*x + bx where A a matrix form
 and b is a vector [b1 b1 b1 b2 b2 b2]
 
 corresponding to the indices of i. That is, all entries in a and b will be ai and bi for pi
-
+'''
 
 '''   ------------------unused for now---------------------------
 def cost_function(x, quad_coefficients, lin_coefficients):
