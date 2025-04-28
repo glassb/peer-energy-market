@@ -314,6 +314,8 @@ constraint = (
 
               )
 
+
+# -------------------------------------------- Cost Function 1 ---------------------------------------------------
 # cost function formulation: this can be quadratic or linear
 '''
 consumer charge is form ax^2 + bx where a and b are coefficients chosen by the consumer
@@ -332,13 +334,15 @@ corresponding to the indices of i. That is, all entries in a and b will be ai an
 '''
 
 
-# -------------------------------------------- Cost Function 1
+
 #These values are the utility service charge prices
 #depend on trade between i to j, because of distances between i and j
 utility_coefficiens = []
 
+
+'''   ------------------unused for now---------------------------
 def cost_function(x, quad_coefficients, lin_coefficients):
-  ''' ------------------unused for now---------------------------
+
   Q = np.zeros((vars_per_timeblock * timeblocks_no, vars_per_timeblock * timeblocks_no))
   C = np.zeros((vars_per_timeblock * timeblocks_no))
   for t in range(timeblocks_no):
@@ -350,10 +354,11 @@ def cost_function(x, quad_coefficients, lin_coefficients):
 
   #Original general return proposed in the paper. We modify
   ##return np.matmul(np.transpose(x),np.matmul(Q,x)) + np.matmul(C,x)
-  '''
+    return np.matmul(np.ones(64), np.maximum(np.zeros(64), x)) #doesn't use the quadratic terms, this is a work in progress
+'''
 
-  #Sums all the outgoing (positive) trades. This is convex because max is convex. If there is a middleman trade, the outgoing trade from origin to destination is duplicated as a middleman outgoing
-  return np.matmul(np.ones(64), np.maximum(np.zeros(64), x))
+# -------------------------------------------- END Cost Function 1 ---------------------------------------------------
+
 
 #set initial guess for every prosumer to get all their power from the grid
 initial_guess = np.tile(np.zeros(vars_per_timeblock),timeblocks_no)
@@ -370,41 +375,6 @@ slackcost = np.matmul(np.ones(4), np.abs(pertime_extra))
 nodalcost = np.matmul(np.ones(12), np.abs(scheduledinjection))
 print("No Middlemen, Optimal cost should achieve: ", (slackcost + nodalcost)/2)
 '''
-
-print("Initial Guess: ", initial_guess)
-
-# return results of optimization problem
-results = opt.minimize(fun=cost_function, args=(quadratic_coefficients, linear_coefficients),x0=initial_guess,constraints=constraint, options={"maxiter": 100, "ftol": 1e-6, "disp":True}) #method="COBYQA"
-
-
-
-#Status:
-  #0 = optimal solution found
-  #1 = iteration limit reached
-  #2 = infeasible
-  #3 = unbounded
-  #6 = ill-conditioned matrix
-  #8 = did not converge in iteration limit
-  #9 = failed, can't make further progress
-print("Optimization Status: ", results.status)
-
-'''
-# printing the output
-for i in range(64):
-  print(timesteps[i // 16],'--',decision_variables[i % 16],':  ',np.round(results.x[i],2),'per unit')
-'''
-
-'''
-#print(np.round(results.x,4))
-
-transform =           [[0,0,0,0,1,1,1,1,0,0,0,0,0,0,0,0],
-                        [0,0,0,0,0,0,0,0,1,1,1,1,0,0,0,0],
-                        [0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1]]
-
-fourTransform = linearalgebra.block_diag(transform,transform,transform,transform)
-
-print(np.matmul(fourTransform,np.round(results.x,4))-np.transpose(scheduledinjection.flatten()))
-
 
 
 
@@ -429,9 +399,19 @@ sum_Pi0_t2_on = np.hstack((t_off,sum_Pi0,t_off,t_off))
 sum_Pi0_t3_on = np.hstack((t_off,t_off,sum_Pi0,t_off))
 sum_Pi0_t4_on = np.hstack((t_off,t_off,t_off,sum_Pi0,))
 
+
+
+#----------------------------------------------------- COST FUNCTION -----------------------------------------------
 # actual cost function
 def cost_function(x, sum_Pi0_t1_on, sum_Pi0_t2_on, sum_Pi0_t3_on, sum_Pi0_t4_on, P_0_target_t1, P_0_target_t2, P_0_target_t3, P_0_target_t4):
-    return (np.matmul(sum_Pi0_t1_on,x) - P_0_target_t1)**2 + (np.matmul(sum_Pi0_t2_on,x) - P_0_target_t2)**2 + (np.matmul(sum_Pi0_t3_on,x) - P_0_target_t3)**2 + (np.matmul(sum_Pi0_t4_on,x) - P_0_target_t4)**2
+  return (np.matmul(sum_Pi0_t1_on,x) - P_0_target_t1)**2 + (np.matmul(sum_Pi0_t2_on,x) - P_0_target_t2)**2 + (np.matmul(sum_Pi0_t3_on,x) - P_0_target_t3)**2 + (np.matmul(sum_Pi0_t4_on,x) - P_0_target_t4)**2
+
+  #second term here represents middleman trading restriction
+  #Sums all the outgoing (positive) trades. This is convex because max is convex. If there is a middleman trade, the outgoing trade from origin to destination is duplicated as a middleman outgoing
+  return np.matmul(np.ones(64), np.maximum(np.zeros(64), x))
+#--------------------------------------------------------------------------------------------------------------------
+
+
 
 #set initial guess for every prosumer to get all their power from the grid
 initial_guess = np.tile(np.zeros(vars_per_timeblock),timeblocks_no)
@@ -442,10 +422,12 @@ for i in range(timeblocks_no):
 
 print("Initial Guess: ", initial_guess)
 
+
+
 # return results of optimization problem
 results = opt.minimize(fun=cost_function,args=(sum_Pi0_t1_on, sum_Pi0_t2_on, sum_Pi0_t3_on, sum_Pi0_t4_on, P_0_target_t1, P_0_target_t2, P_0_target_t3, P_0_target_t4),x0=initial_guess,constraints=constraint, options={"maxiter": 100, "ftol": 1e-5, "disp":True}) #can add method="method"
 
-'''
+
 #Status:
   #0 = optimal solution found
   #1 = iteration limit reached
@@ -471,6 +453,16 @@ for i in range(64):
 for i in range(64):
   print(timesteps[i // 16],'--', decision_variables[i % 16],':  ', results.x[i], 'per unit')
 
+
+
+#unsure what this is, but had to move it down below the solver
+transform =           [[0,0,0,0,1,1,1,1,0,0,0,0,0,0,0,0],
+                        [0,0,0,0,0,0,0,0,1,1,1,1,0,0,0,0],
+                        [0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1]]
+
+fourTransform = linearalgebra.block_diag(transform,transform,transform,transform)
+
+print(np.matmul(fourTransform,np.round(results.x,4))-np.transpose(scheduledinjection.flatten()))
 
 
 # ----------------------------------------------------- Recovering P_injected_battery = Sum_P_ij - P_scheduled_inj
