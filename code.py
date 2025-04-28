@@ -381,11 +381,13 @@ print("No Middlemen, Optimal cost should achieve: ", (slackcost + nodalcost)/2)
 # ---------------------------------------------------------------------- Cost Function 2
 # Kelsey's Version of Cost Function (Incentivizes sending some predetermined amount to slack bus)
 
-# Set target injection that slack bus would like to achieve
+# Set negatie target injection that slack bus would like to achieve (the target power that slack wants to achieve)
 P_0_target = np.array([[3],
                        [3], 
                        [3], 
                        [3]])
+
+timepoint_weights = np.array([[.8], [.1], [.2], [.8]])
 '''
 P_0_target_t1 = P_0_target[0][0]
 P_0_target_t2 = P_0_target[1][0]
@@ -403,24 +405,26 @@ sum_Pi0_t3_on = np.hstack((t_off,t_off,sum_Pi0,t_off))
 sum_Pi0_t4_on = np.hstack((t_off,t_off,t_off,sum_Pi0,))
 '''
 
-
 #----------------------------------------------------- COST FUNCTION -----------------------------------------------
 # actual cost function
-def cost_function(x, P_0_target):
+def cost_function(x, P_0_target, timepoint_weights):
 
   #Kelsey's P0 Target Injection
   # setting up structure/variables for cost function
-  sum_P0j = np.array([0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0])
-  sum_P0jt = linearalgebra.block_diag(sum_P0j, sum_P0j, sum_P0j, sum_P0j)
+  sum_Pi0 = np.array([0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0])
+  sum_Pi0t = linearalgebra.block_diag(sum_Pi0, sum_Pi0, sum_Pi0, sum_Pi0)
 
-  P0_targetdiff = np.matmul(sum_P0jt, x) - np.ndarray.flatten(P_0_target)
-  P0_target_penalty = (np.matmul(np.transpose(P0_targetdiff), P0_targetdiff))
+  weights_diag = np.diag(np.ndarray.flatten(timepoint_weights))
+
+  P0_weighted_targetdiff = np.matmul(weights_diag, np.matmul(sum_Pi0t, x) - np.ndarray.flatten(P_0_target))
+  P0_target_penalty = (np.matmul(np.transpose(P0_weighted_targetdiff), P0_weighted_targetdiff))
 
 
   #Ryan's middleman restriction
   #Sums all the outgoing (positive) trades. This is convex because max is convex. If there is a middleman trade, the outgoing trade from origin to destination is duplicated as a middleman outgoing
-  middleman_penalty = np.matmul(np.ones(64), np.maximum(np.zeros(64), x))
-  return middleman_penalty + P0_target_penalty
+  #squared to make the function differentiable at every point, easier for the optimizer
+  middleman_penalty = (np.matmul(np.ones(64), np.maximum(np.zeros(64), x))) ** 2
+  return middleman_penalty + P0_target_penalty 
 
 #--------------------------------------------------------------------------------------------------------------------
 
@@ -438,7 +442,7 @@ print("Initial Guess: ", initial_guess)
 
 
 # return results of optimization problem
-results = opt.minimize(fun=cost_function,args=(P_0_target),x0=initial_guess,constraints=constraint, options={"maxiter": 100, "ftol": 1e-5, "disp":True}) #can add method="method"
+results = opt.minimize(fun=cost_function,args=(P_0_target, timepoint_weights),x0=initial_guess,constraints=constraint, options={"maxiter": 100, "ftol": 1e-5, "disp":True}) #can add method="method"
 
 
 #Status:
