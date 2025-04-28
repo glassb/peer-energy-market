@@ -41,7 +41,7 @@ timesteps = ['T1','T2','T3','T4']
 timeblocks_no = 4
 vars_per_timeblock = 16
 nodecount = 4
-timestep = 4 #duration in hours
+timestep_duration = 4 #duration in hours
 
 #injection schedule for node i at time t (i=1 t=0, i=2 t=0, i=3 t=0, i=1 t=1, i=2 t=1.....), a negative injection is load, positive is generation
 #Slack bus NOT included!!!
@@ -126,36 +126,9 @@ v_min = np.array([[v_min_squared],[v_min_squared],[v_min_squared],[v_min_squared
 constraint_19c_min =  {'type':'ineq','fun': lambda x: np.matmul(R_matrix_4_timesteps,np.matmul(sum_pij_4_timesteps,x)) + np.ndarray.flatten(v_bar_4_timesteps - v_min)}
 constraint_19c_max =  {'type':'ineq','fun': lambda x: np.ndarray.flatten(v_max - v_bar_4_timesteps) - (np.matmul(R_matrix_4_timesteps,np.matmul(sum_pij_4_timesteps,x)))}
 
-# --------------------------------------translate nparray into a list
-# this translates a nparray into a list. Seems as though the optimizer wants all data types in an given constraint to be of a particular type.
-# when 19c max is not commented out
-# constraint_19c_max =  {'type':'ineq','fun': lambda x: v_max - (np.matmul(R_matrix_4_timesteps,np.matmul(sum_pij_4_timesteps,x)))}
-# removed v_bar_4_timesteps which is a np.array of 12x1. I think it needs to be one dimension. similar to v_max. below is code that does this.
 
-# https://numpy.org/doc/2.2/reference/generated/numpy.ndarray.flatten.html
-# https://numpy.org/doc/2.2/reference/generated/numpy.ndarray.tolist.html
-# https://docs.python.org/3/tutorial/datastructures.html
-''' Not used here, the flattening works above
-v_bar_list = v_bar.flatten(order='C').tolist()
 
-# v_max - v_bar
-v_max_minus_v_bar_4_timesteps = []
-for t in range(4):
-    for i in v_bar_list:
-        v_max_minus_v_bar_4_timesteps.append(1.05-i)
 
-# v_bar - v_min
-v_bar_minus_v_min_4_timesteps = []
-for t in range(4):
-    for i in v_bar_list:
-        v_bar_minus_v_min_4_timesteps.append(i-0.95)
-        '''
-# --------------------------------------translate nparray into a list
-
-#constraint_19c_min =  {'type':'ineq','fun': lambda x: np.matmul(R_matrix_4_timesteps, np.matmul(sum_pij_4_timesteps,x)) + v_bar_minus_v_min_4_timesteps}
-#constraint_19c_max =  {'type':'ineq','fun': lambda x: v_max_minus_v_bar_4_timesteps - np.matmul(R_matrix_4_timesteps,np.matmul(sum_pij_4_timesteps,x))}
-
-#Ben update
 # ---------------------------------- f: POWER FLOW CONSTRAINTS
 
 #Wbar matrix for 4 node system
@@ -196,11 +169,11 @@ sum_pij_4_timesteps = linearalgebra.block_diag(sum_pij,sum_pij,sum_pij,sum_pij)
 
 #Start each battery with 50kWh, all have the same hardware settings
 #Slack has no battery constraints, and no battery! These are indexed beginning at node 1
-batt_initial = np.array([[50], [50], [50]])
-batt_min_e = np.array([[50], [50], [50]])
-batt_max_e = np.array([[50], [50], [50]])
-batt_min_p = np.array([[0], [0], [0]])
-batt_max_p = np.array([[0], [0], [0]])
+batt_initial = np.array([[80], [80], [80]])
+batt_min_e = np.array([[2], [10], [4]]) #user set minimum charge state
+batt_max_e = np.array([[12], [12], [22]]) #user set maximum charge state (powerwall is 13.5, user 3 has two powerwall batteries)
+batt_min_p = np.array([[-7.5], [-7.5], [-7.5]]) #40A breaker 240V, at 80% capacity
+batt_max_p = np.array([[7.5], [7.5], [7.5]])
 
 batt_initial_t = np.vstack((batt_initial, batt_initial, batt_initial, batt_initial))
 batt_min_e_t = np.vstack((batt_min_e, batt_min_e, batt_min_e, batt_min_e))
@@ -302,15 +275,11 @@ constraint = (
               #Power Max
               {'type':'ineq','fun': lambda x: np.ndarray.flatten(scheduledinjection + batt_max_p_t) - np.matmul(sumj_Pijt, x)},
               #Charge State Min
-              {'type':'ineq','fun': lambda x: np.ndarray.flatten(batt_initial_t - batt_min_e_t) - (np.matmul(energyadded, np.matmul(sumj_Pijt, x) - np.ndarray.flatten(scheduledinjection)) * timestep)},
+              {'type':'ineq','fun': lambda x: np.ndarray.flatten(batt_initial_t - batt_min_e_t) - (np.matmul(energyadded, np.matmul(sumj_Pijt, x) - np.ndarray.flatten(scheduledinjection)) * timestep_duration)},
               #Charge State Max
-              {'type':'ineq','fun': lambda x: np.ndarray.flatten(batt_max_e_t - batt_initial_t) + (np.matmul(energyadded, np.matmul(sumj_Pijt, x) - np.ndarray.flatten(scheduledinjection)) * timestep)},
+              {'type':'ineq','fun': lambda x: np.ndarray.flatten(batt_max_e_t - batt_initial_t) + (np.matmul(energyadded, np.matmul(sumj_Pijt, x) - np.ndarray.flatten(scheduledinjection)) * timestep_duration)},
               #Final Charge State, return to where it started
               {'type':'eq','fun': lambda x: np.matmul(totalbattpower, (np.matmul(sumj_Pijt, x) - np.ndarray.flatten(scheduledinjection)))},
-
-
-              #Testconstraint, need to delete. Make supply meet demand with trades, for the sake of debugging
-              #{'type':'eq','fun': lambda x: np.matmul(sumj_Pijt, x) - np.ndarray.flatten(scheduledinjection)}
 
               )
 
@@ -334,10 +303,6 @@ corresponding to the indices of i. That is, all entries in a and b will be ai an
 '''
 
 
-
-#These values are the utility service charge prices
-#depend on trade between i to j, because of distances between i and j
-utility_coefficiens = []
 
 
 '''   ------------------unused for now---------------------------
@@ -381,29 +346,14 @@ print("No Middlemen, Optimal cost should achieve: ", (slackcost + nodalcost)/2)
 # ---------------------------------------------------------------------- Cost Function 2
 # Kelsey's Version of Cost Function (Incentivizes sending some predetermined amount to slack bus)
 
-# Set negatie target injection that slack bus would like to achieve (the target power that slack wants to achieve)
+# Set negative target injection that slack bus would like to achieve (the target power that slack wants to receive)
 P_0_target = np.array([[3],
                        [3], 
                        [3], 
                        [3]])
 
 timepoint_weights = np.array([[.8], [.1], [.2], [.8]])
-'''
-P_0_target_t1 = P_0_target[0][0]
-P_0_target_t2 = P_0_target[1][0]
-P_0_target_t3 = P_0_target[2][0]
-P_0_target_t4 = P_0_target[3][0]
-'''
 
-
-
-'''
-t_off = np.zeros((1,16))
-sum_Pi0_t1_on = np.hstack((sum_Pi0,t_off,t_off,t_off))
-sum_Pi0_t2_on = np.hstack((t_off,sum_Pi0,t_off,t_off))
-sum_Pi0_t3_on = np.hstack((t_off,t_off,sum_Pi0,t_off))
-sum_Pi0_t4_on = np.hstack((t_off,t_off,t_off,sum_Pi0,))
-'''
 
 #----------------------------------------------------- COST FUNCTION -----------------------------------------------
 # actual cost function
@@ -496,7 +446,7 @@ idx = 0
 
 # sum_pij_array is a 4x4 array which stores the sum_pij
 sum_pij_array = np.zeros((4,4))
-for timestep in range(0,4):
+for timestep_duration in range(0, 4):
     #print("timestep:", timestep)
     for n in range(0,4):
         #print("node:", n)
@@ -504,7 +454,7 @@ for timestep in range(0,4):
             #print("trade:", trade)
             # sum each trade into the array[timestep][node]
             #print("adding ", np.round(results.x[idx],2))
-            sum_pij_array[timestep,n] = sum_pij_array[timestep,n] + np.round(results.x[idx],2)
+            sum_pij_array[timestep_duration,n] = sum_pij_array[timestep_duration,n] + np.round(results.x[idx], 2)
             
             #print("_______________________")
             #print("|", sum_pij_array[0,0],"|",sum_pij_array[0,1],"|",sum_pij_array[0,2],"|",sum_pij_array[0,3],"|")
