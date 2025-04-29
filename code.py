@@ -334,13 +334,6 @@ for i in range(timeblocks_no):
 
 
 
-#-------------unused block, used dispay minimum cost without batteries for debugging-------------------
-pertime_extra = np.matmul(linearalgebra.block_diag(np.ones(3),np.ones(3), np.ones(3), np.ones(3)), scheduledinjection)
-slackcost = np.matmul(np.ones(4), np.abs(pertime_extra))
-nodalcost = np.matmul(np.ones(12), np.abs(scheduledinjection))
-print("No Middlemen, Optimal cost should achieve: ", (slackcost + nodalcost)/2)
-
-
 
 
 # ---------------------------------------------------------------------- Cost Function 2
@@ -352,22 +345,31 @@ P_0_target = np.array([[3],
                        [3], 
                        [3]])
 
-timepoint_weights = np.array([[.8], [.1], [.2], [.8]])
+timepoint_weights = np.array([[10], [0], [0], [0]])
 
 
 #----------------------------------------------------- COST FUNCTION -----------------------------------------------
 # actual cost function
-def cost_function(x, P_0_target, timepoint_weights):
+def cost_function(x, P_0_target, timepoint_weights, resistance_matrix, vbar):
 
   #Kelsey's P0 Target Injection
   # setting up structure/variables for cost function
   sum_Pi0 = np.array([0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0])
   sum_Pi0t = linearalgebra.block_diag(sum_Pi0, sum_Pi0, sum_Pi0, sum_Pi0)
 
+  sumPij = linearalgebra.block_diag(np.ones(4), np.ones(4), np.ones(4))
+  sumPij = np.hstack((np.zeros((3, 4)), sumPij))
+  sumPijt = linearalgebra.block_diag(sumPij, sumPij, sumPij, sumPij)
+
   weights_diag = np.diag(np.ndarray.flatten(timepoint_weights))
 
+  #Kelsey's Grid Operator Power Targets
   P0_weighted_targetdiff = np.matmul(weights_diag, np.matmul(sum_Pi0t, x) - np.ndarray.flatten(P_0_target))
   P0_target_penalty = (np.matmul(np.transpose(P0_weighted_targetdiff), P0_weighted_targetdiff))
+
+
+  #Ryan's voltage losses
+  node_voltages = np.matmul(resistance_matrix, np.matmul(sum_pij_4_timesteps, x)) + np.ndarray.flatten(vbar)
 
 
   #Ryan's middleman restriction
@@ -377,7 +379,6 @@ def cost_function(x, P_0_target, timepoint_weights):
   return middleman_penalty + P0_target_penalty 
 
 #--------------------------------------------------------------------------------------------------------------------
-
 
 
 #set initial guess for every prosumer to get all their power from the grid
@@ -392,7 +393,7 @@ print("Initial Guess: ", initial_guess)
 
 
 # return results of optimization problem
-results = opt.minimize(fun=cost_function,args=(P_0_target, timepoint_weights),x0=initial_guess,constraints=constraint, options={"maxiter": 100, "ftol": 1e-5, "disp":True}) #can add method="method"
+results = opt.minimize(fun=cost_function,args=(P_0_target, timepoint_weights, R_matrix_4_timesteps, v_bar_4_timesteps),x0=initial_guess,constraints=constraint, options={"maxiter": 100, "ftol": 1e-5, "disp":True}) #can add method="method"
 
 
 #Status:
@@ -422,6 +423,18 @@ for i in range(64):
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
 #unsure what this is, but had to move it down below the solver
 transform =           [[0,0,0,0,1,1,1,1,0,0,0,0,0,0,0,0],
                         [0,0,0,0,0,0,0,0,1,1,1,1,0,0,0,0],
@@ -446,15 +459,15 @@ idx = 0
 
 # sum_pij_array is a 4x4 array which stores the sum_pij
 sum_pij_array = np.zeros((4,4))
-for timestep_duration in range(0, 4):
-    #print("timestep:", timestep)
-    for n in range(0,4):
-        #print("node:", n)
-        for trade in range(0,4):
+for timestep in range(0, 4):
+  #print("timestep:", timestep)
+  for n in range(0,4):
+    #print("node:", n)
+    for trade in range(0,4):
             #print("trade:", trade)
             # sum each trade into the array[timestep][node]
             #print("adding ", np.round(results.x[idx],2))
-            sum_pij_array[timestep_duration,n] = sum_pij_array[timestep_duration,n] + np.round(results.x[idx], 2)
+      sum_pij_array[timestep,n] = sum_pij_array[timestep,n] + np.round(results.x[idx], 2)
             
             #print("_______________________")
             #print("|", sum_pij_array[0,0],"|",sum_pij_array[0,1],"|",sum_pij_array[0,2],"|",sum_pij_array[0,3],"|")
@@ -463,7 +476,7 @@ for timestep_duration in range(0, 4):
             #print("|", sum_pij_array[3,0],"|",sum_pij_array[3,1],"|",sum_pij_array[3,2],"|",sum_pij_array[3,3],"|")
             #print("_______________________")
 
-            idx = idx + 1
+      idx = idx + 1
 
 #injection schedule for node i at time t (i=1 t=0, i=2 t=0, i=3 t=0, i=1 t=1, i=2 t=1.....), a negative injection is load, positive is generation. Slack bus NOT included!!!
 #scheduledinjection = np.array([[-2], [.5], [1], [3], [5], [4], [-6], [-4], [-3], [-.8], [-2], [1]])
@@ -475,3 +488,47 @@ p_ij_initial  = np.concatenate((np.zeros((4,1)), np.reshape(scheduledinjection, 
 b_p = sum_pij_array - p_ij_initial
 b_p
 
+
+
+
+# ------------------------------------ RYAN BATTERY STATE --------------------------------------------
+tradesum_arr = linearalgebra.block_diag(np.ones(4),np.ones(4),np.ones(4),np.ones(4))
+tradesum_arr_t = linearalgebra.block_diag(tradesum_arr, tradesum_arr, tradesum_arr, tradesum_arr)
+
+#Trade Sum
+tradesum = np.matmul(tradesum_arr_t, results.x)
+
+#power battery injects to node
+battery_power = np.matmul(sumj_Pijt, results.x) - np.ndarray.flatten(scheduledinjection)
+
+#battery state at the START of each timestep
+battery_state = np.ndarray.flatten(batt_initial_t) - (np.matmul(energyadded, np.matmul(sumj_Pijt, results.x) - np.ndarray.flatten(scheduledinjection)) * timestep_duration)
+
+#Voltage at nodes
+node_voltage = np.sqrt(np.matmul(R_matrix_4_timesteps,np.matmul(sum_pij_4_timesteps,results.x)) + np.ndarray.flatten(v_bar_4_timesteps))
+
+print("Battery State BEFORE timestep: ", battery_state)
+print("Battery Power:                 ", battery_power)
+print("Power Injected at all nodes: ", tradesum)
+print("Node Voltages: ", node_voltage)
+
+v1_mtx = linearalgebra.block_diag(np.ones((4,1)),np.ones((4,1)), np.ones((4,1)),np.ones((4,1)))
+v2_mtx = np.vstack((np.identity(4),np.identity(4), np.identity(4), np.identity(4)))
+diff_mtx = v1_mtx - v2_mtx
+onearray = np.array([1])
+
+all_node_voltage = np.concatenate((onearray, node_voltage[0:3], onearray, node_voltage[3:6], onearray, node_voltage[6:9], onearray, node_voltage[9:12]))
+
+voltage_diff_mtx = linearalgebra.block_diag(diff_mtx, diff_mtx, diff_mtx, diff_mtx)
+
+#Gives a vector indexed the same way as the power trades, with all the voltage differences between node a and node b at time t
+all_node_voltage_diff = np.matmul(voltage_diff_mtx, all_node_voltage)
+
+all_node_voltage_diff_squared = np.matmul(np.diag(all_node_voltage_diff), all_node_voltage_diff)
+
+
+
+print(all_node_voltage_diff_squared)
+resistancearr = np.array([[1, -1, 0, 0],
+                          [0, 1, -1, 0],
+                          [0, 0, 1, -1]])
