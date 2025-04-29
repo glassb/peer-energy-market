@@ -38,6 +38,13 @@ vars_per_timeblock = 16
 nodecount = 4
 timestep_duration = 4 #duration in hours
 
+# divide voltages by V_b
+v_base = 10000  #V
+# divide powers by S_b
+s_base = 1000   #W
+# divide impedances by Z_b
+z_base = (v_base * v_base)/s_base  #kOhms
+
 #injection schedule for node i at time t (i=1 t=0, i=2 t=0, i=3 t=0, i=1 t=1, i=2 t=1.....), a negative injection is load, positive is generation
 #Slack bus NOT included!!!
 # t1 = 0000 - 0400, t2 = 0400 - 0800, t3 = 0800 - 1200, t4 = 1200 - 1600
@@ -131,12 +138,7 @@ big_W_inv = np.linalg.inv(big_W)
 
 big_W_inv_T = np.transpose(big_W_inv)
 
-# divide voltages by V_b
-v_base = 10000  #V
-# divide powers by S_b
-s_base = 1000   #W
-# divide impedances by Z_b
-z_base = (v_base * v_base)/s_base  #kOhms
+
 
 # values adopted from paper 43 referenced in Ullah and Park. Units in ohms.
 F_r = np.diag([1.3509/z_base, 1.17024/z_base, 0.84111/z_base])                      
@@ -523,6 +525,7 @@ b_p = sum_pij_array - p_ij_initial
 print("b_p = sum_pij_array - p_ij_initial  (negative means additional pwr added to battery)")
 print(b_p)
 print(" ")
+
 
 # Print picture
 # Example code copied from below and modified to fit our use case
