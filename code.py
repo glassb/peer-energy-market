@@ -12,21 +12,16 @@ Original file is located at
 # 4/10
 
 '''
-          
           node 0 (slack) ------- node 1 ------- node 2 ------- node 3
-
-
 '''
 
 import numpy as np
 from scipy import optimize as opt
 from scipy import linalg as linearalgebra
 
-
 '''
 Decision Variables Index: [24 energy trades]
 [00 01 02 03 10 11 12 13 20 21 22 23 30 31 32 33]
-
 
 00 01 02 03
 10 11 12 13
@@ -43,11 +38,21 @@ vars_per_timeblock = 16
 nodecount = 4
 timestep_duration = 4 #duration in hours
 
+# divide voltages by V_b
+v_base = 10000  #V
+# divide powers by S_b
+s_base = 1000   #W
+# divide impedances by Z_b
+z_base = (v_base * v_base)/s_base  #kOhms
+
 #injection schedule for node i at time t (i=1 t=0, i=2 t=0, i=3 t=0, i=1 t=1, i=2 t=1.....), a negative injection is load, positive is generation
 #Slack bus NOT included!!!
-scheduledinjection = np.array([[-2], [.5], [1], [3], [5], [4], [-6], [-4], [-3], [-.8], [-2], [1]])
+# t1 = 0000 - 0400, t2 = 0400 - 0800, t3 = 0800 - 1200, t4 = 1200 - 1600
+# node 1,2,3 have PV.
+scheduledinjection = np.array([[-11.5/s_base], [-10/s_base], [-12/s_base], [3/s_base], [3.5/s_base], [4/s_base], [71/s_base], [70/s_base], [68/s_base], [67/s_base], [65/s_base], [63/s_base]])
 
-
+# Below is an alternative scheduled injection array. node 1,2 have PV. node 3 does not have a PV but does have a battery.
+#scheduledinjection = np.array([[-11.5/s_base], [-10/s_base], [-12/s_base], [3/s_base], [3.5/s_base], [-8.5/s_base], [71/s_base], [70/s_base], [-2.5/s_base], [67/s_base], [65/s_base], [-2.5/s_base]])
 
 #we can set individual bounds for any of the decision variables
 bounds = []
@@ -57,8 +62,14 @@ bounds = []
 
 
 
-# ---------------------------------- b: HARDWARE POWER CONSTRAINTS
+# ---------------------------------- b part 1: HARDWARE POWER CONSTRAINTS
 # x is a vector of 16*4 variables
+# Incidence matrix so that sum_pij * x(optimization variables) = P_b + P_i
+sum_pij = np.array([[0,0,0,0,1,1,1,1,0,0,0,0,0,0,0,0],
+                    [0,0,0,0,0,0,0,0,1,1,1,1,0,0,0,0],
+                    [0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1]])
+
+sum_pij_4_timesteps = linearalgebra.block_diag(sum_pij,sum_pij,sum_pij,sum_pij)
 
 # might need to play around with these values
 hardware_p_min = [-15, -15, -15, -15, -15, -15, -15, -15, -15, -15, -15, -15]
@@ -66,8 +77,47 @@ hardware_p_max = [15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15]
 
 # all the input arrays must have same number of dimensions, but the array at index 0 has 1 dimension(s) and the array at index 1 has 2 dimension(s)
 
-constraint_19b_min =  {'type':'ineq','fun': lambda x: np.matmul(sum_pij_4_timesteps, x) - hardware_p_min}
-constraint_19b_max =  {'type':'ineq','fun': lambda x: hardware_p_max - np.matmul(sum_pij_4_timesteps, x)}
+constraint_19bp1_min =  {'type':'ineq','fun': lambda x: np.matmul(sum_pij_4_timesteps, x) - hardware_p_min}
+constraint_19bp1_max =  {'type':'ineq','fun': lambda x: hardware_p_max - np.matmul(sum_pij_4_timesteps, x)}
+
+# -----------------------------------b part 2: POWER TRADING CONSTRAINTS
+
+# this is the forcasted amount that we anticipate the node will demand for t=1,2,3,4
+P_nd = np.array([[1],      #t=1 node 1
+                 [1],      #t=1 node 2
+                 [1],
+                 [1],      #t=2
+                 [1],
+                 [1],
+                 [1],      #t=3
+                 [1],
+                 [1],
+                 [1],      #t=4
+                 [1],
+                 [1]])
+
+# sum_pij_4_timesteps = linearalgebra.block_diag(sum_pij,sum_pij,sum_pij,sum_pij)
+
+# this is the forcasted amount that we anticipate the PV panel will be able to produce for t=1,2,3,4
+P_a_Pv = np.array([[6],     #t=1 node 1
+                   [6],     #t=1 node 2
+                   [6],
+                   [6],     #t=2
+                   [6],
+                   [6],
+                   [6],     #t=3
+                   [6], 
+                   [6],
+                   [6],     #t=4
+                   [6],
+                   [6]])
+
+P_i_min = -1*P_nd
+
+P_i_max = P_a_Pv - P_nd
+
+constraint_19bp2_min =  {'type':'ineq','fun': lambda x: np.matmul(sum_pij_4_timesteps, x) - np.ndarray.flatten(P_i_min)}
+constraint_19bp2_max =  {'type':'ineq','fun': lambda x: np.ndarray.flatten(P_i_max) - np.matmul(sum_pij_4_timesteps, x)}
 
 # ---------------------------------- c: VOLTAGE CONSTRAINTS
 
@@ -88,18 +138,11 @@ big_W_inv = np.linalg.inv(big_W)
 
 big_W_inv_T = np.transpose(big_W_inv)
 
-# divide voltages by V_b
-v_base = 10000  #V
-# divide powers by S_b
-s_base = 1000   #W
-# divide impedances by Z_b
-z_base = (v_base * v_base)/s_base  #kOhms
+
 
 # values adopted from paper 43 referenced in Ullah and Park. Units in ohms.
-
 F_r = np.diag([1.3509/z_base, 1.17024/z_base, 0.84111/z_base])                      
 F_x = np.diag([1.32349/z_base, 1.14464/z_base, 0.82271/z_base])           
-
 
 q_constant = np.array([[2],
                        [2],
@@ -111,7 +154,6 @@ v_bar = np.matmul(big_W_inv, -1*little_wbar) + np.matmul(np.matmul(np.matmul(big
 
 R_matrix_4_timesteps = linearalgebra.block_diag(R_matrix,R_matrix,R_matrix,R_matrix)                                          #12x12
 v_bar_4_timesteps = np.vstack((v_bar,v_bar,v_bar,v_bar))                                                                      #12x1
-
 
 # upper and lower bounds
 v_max_squared = 1.05*1.05
@@ -158,7 +200,7 @@ f_matrix = np.matmul(W_inv_T_4_timesteps,nodal_power_transform_4_timesteps)
 fmax = np.multiply(15,[1,1,1,1,1,1,1,1,1,1,1,1])
 fmin = np.multiply(15,[-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1])
 
-#Battery Constraints
+#----------------------------------------------------------------Battery Constraints
 
 # Incidence matrix so that sum_pij * x(optimization variables) = P_b + P_i
 sum_pij = np.array([[0,0,0,0,1,1,1,1,0,0,0,0,0,0,0,0],
@@ -189,8 +231,6 @@ for i in range(timeblocks_no):
     for k in range(nodecount):
       sumj_Pijt[i * (nodecount-1) + j][vars_per_timeblock * i + (nodecount) * j + k + nodecount] = 1
 
-
-
 #produces the matrix that sums all previous power injections into a battery (it is a 3x3 identity that appears in every submatrix below the diagonal in a 12x12)
 #when multiplying sumPijt(x) into this matrix, it produces the energy state at the start of time interval t for battery at node i
 '''
@@ -212,7 +252,6 @@ for i in range(timeblocks_no):
     for k in range(nodecount - 1):
       if k < i:
         energyadded[i * (nodecount - 1) + j][k * (nodecount - 1) + j] = 1
-
 
 #create a matrix that is a 3x12, which will sum the power injected to each battery.
 totalbattpower = np.identity((nodecount - 1))
@@ -250,13 +289,17 @@ for i in range(timeblocks_no): #this loop iterates through time blocks
 
 
 
+
 # ---------------------------------- CONSTRAINTS
-
 constraint = (
-              # (19b) constraints: Harware Power Constraints
-              constraint_19b_min,
-              constraint_19b_max,
+              # (19bp1) constraints: Harware Power Constraints
+              constraint_19bp1_min,
+              constraint_19bp1_max,
 
+              # (19bp2) constraints: Max Injection Constraint
+              #constraint_19bp2_min,
+              #constraint_19bp2_max,
+    
               # (19c) constraints: Voltage Constraints
               constraint_19c_min,
               constraint_19c_max,
@@ -280,13 +323,13 @@ constraint = (
               {'type':'ineq','fun': lambda x: np.ndarray.flatten(batt_max_e_t - batt_initial_t) + (np.matmul(energyadded, np.matmul(sumj_Pijt, x) - np.ndarray.flatten(scheduledinjection)) * timestep_duration)},
               #Final Charge State, return to where it started
               {'type':'eq','fun': lambda x: np.matmul(totalbattpower, (np.matmul(sumj_Pijt, x) - np.ndarray.flatten(scheduledinjection)))},
-
               )
 
 
 # -------------------------------------------- Cost Function 1 ---------------------------------------------------
-# cost function formulation: this can be quadratic or linear
+
 '''
+#cost function formulation: this can be quadratic or linear
 consumer charge is form ax^2 + bx where a and b are coefficients chosen by the consumer
 To get in the cost function form we will see (x)T*A*x + bx where A a matrix form:
 
@@ -301,9 +344,6 @@ and b is a vector [b1 b1 b1 b2 b2 b2]
 
 corresponding to the indices of i. That is, all entries in a and b will be ai and bi for pi
 '''
-
-
-
 
 '''   ------------------unused for now---------------------------
 def cost_function(x, quad_coefficients, lin_coefficients):
@@ -333,10 +373,8 @@ for i in range(timeblocks_no):
     initial_guess[((j+1) * nodecount)+(i*vars_per_timeblock)] = scheduledinjection[j+ (i * (nodecount - 1))][0]
 
 
-
-
-
 # ---------------------------------------------------------------------- Cost Function 2
+
 # Kelsey's Version of Cost Function (Incentivizes sending some predetermined amount to slack bus)
 
 # Set negative target injection that slack bus would like to achieve (the target power that slack wants to receive)
@@ -378,8 +416,8 @@ def cost_function(x, P_0_target, timepoint_weights, resistance_matrix, vbar):
   middleman_penalty = (np.matmul(np.ones(64), np.maximum(np.zeros(64), x))) ** 2
   return middleman_penalty + P0_target_penalty 
 
-#--------------------------------------------------------------------------------------------------------------------
 
+#---------------------------------------------------------Initial Guess
 
 #set initial guess for every prosumer to get all their power from the grid
 initial_guess = np.tile(np.zeros(vars_per_timeblock),timeblocks_no)
@@ -389,12 +427,12 @@ for i in range(timeblocks_no):
     initial_guess[((j+1) * nodecount)+(i*vars_per_timeblock)] = scheduledinjection[j+ (i * (nodecount - 1))][0]
 
 print("Initial Guess: ", initial_guess)
+print(" ")
 
-
+#----------------------------------------------------------Optimization Problem Results
 
 # return results of optimization problem
 results = opt.minimize(fun=cost_function,args=(P_0_target, timepoint_weights, R_matrix_4_timesteps, v_bar_4_timesteps),x0=initial_guess,constraints=constraint, options={"maxiter": 100, "ftol": 1e-5, "disp":True}) #can add method="method"
-
 
 #Status:
   #0 = optimal solution found
@@ -405,9 +443,7 @@ results = opt.minimize(fun=cost_function,args=(P_0_target, timepoint_weights, R_
   #8 = did not converge in iteration limit
   #9 = failed, can't make further progress
 print("Optimization Status: ", results.status)
-
-
-
+print(" ")
 
 #round all values to a specific decimal precision
 decimal_precision = 2
@@ -444,7 +480,6 @@ fourTransform = linearalgebra.block_diag(transform,transform,transform,transform
 
 print(np.matmul(fourTransform,np.round(results.x,4))-np.transpose(scheduledinjection.flatten()))
 
-
 # ----------------------------------------------------- Recovering P_injected_battery = Sum_P_ij - P_scheduled_inj
 
 # This block of code sums all trades from a particular node to all other nodes at timestep t into an array structure like below.
@@ -452,8 +487,6 @@ print(np.matmul(fourTransform,np.round(results.x,4))-np.transpose(scheduledinjec
 # ts = 1, from node 0 | ts = 2, from node 1 | ts = 2, from node 2 | ts = 2, from node 3 | 
 # ts = 2, from node 0 | ts = 3, from node 1 | ts = 3, from node 2 | ts = 3, from node 3 |
 # ts = 3, from node 0 | ts = 4, from node 1 | ts = 4, from node 2 | ts = 4, from node 3 | 
-
-# Recovering P_injected_battery = Sum_P_ij - P_scheduled_inj
 
 idx = 0
 
@@ -478,16 +511,37 @@ for timestep in range(0, 4):
 
       idx = idx + 1
 
-#injection schedule for node i at time t (i=1 t=0, i=2 t=0, i=3 t=0, i=1 t=1, i=2 t=1.....), a negative injection is load, positive is generation. Slack bus NOT included!!!
-#scheduledinjection = np.array([[-2], [.5], [1], [3], [5], [4], [-6], [-4], [-3], [-.8], [-2], [1]])
 
+#----------------------------------------------------------------------------Results
+# display constraint P_i_t_max or P_i_t_min.
+print("constraints constraint_19bp2_min, constraint_19bp2_max are off")
+#print(P_i_min)
+print(" ")
+#print(P_i_max)
+print(" ")
+
+# display amount requested by slack bus 
+print("slack bus is requesting")
+print(P_0_target)
+print(" ")
+
+# negative number means consumed, positive number means injected
+print("sum_pij (horizontal axis is node, vertical axis is timestep) Negative number means consumed, positive means injected")
+print(sum_pij_array)
+print(" ")
+
+#injection schedule for node i at time t (i=1 t=0, i=2 t=0, i=3 t=0, i=1 t=1, i=2 t=1.....), a negative injection is load, positive is generation. Slack bus NOT included!!!
 #put the provided scheduleinjection vector into an array of the same shape of "sum_pij_array" (which holds sum of Pij) 
 p_ij_initial  = np.concatenate((np.zeros((4,1)), np.reshape(scheduledinjection, (4,3))), axis = 1)
+print("scheduledinjection variable is at time t")
+print(p_ij_initial)
+print(" ")
 
 # let b_p be sum_pij_array - p_ij_initial 
 b_p = sum_pij_array - p_ij_initial
-b_p
-
+print("b_p = sum_pij_array - p_ij_initial  (negative means additional pwr added to battery)")
+print(b_p)
+print(" ")
 
 
 
@@ -512,6 +566,7 @@ print("Battery Power:                 ", battery_power)
 print("Power Injected at all nodes: ", tradesum)
 print("Node Voltages: ", node_voltage)
 
+''' ---------------------------unused, but may be useful if voltage differences needed ---------------------
 v1_mtx = linearalgebra.block_diag(np.ones((4,1)),np.ones((4,1)), np.ones((4,1)),np.ones((4,1)))
 v2_mtx = np.vstack((np.identity(4),np.identity(4), np.identity(4), np.identity(4)))
 diff_mtx = v1_mtx - v2_mtx
@@ -524,4 +579,54 @@ voltage_diff_mtx = linearalgebra.block_diag(diff_mtx, diff_mtx, diff_mtx, diff_m
 #Gives a vector indexed the same way as the power trades, with all the voltage differences between node a and node b at time t
 all_node_voltage_diff = np.matmul(voltage_diff_mtx, all_node_voltage)
 
+#unused here
 all_node_voltage_diff_squared = np.matmul(np.diag(all_node_voltage_diff), all_node_voltage_diff)
+---------------------------------------------------------------------------------------------'''
+
+
+# Print picture
+# Example code copied from below and modified to fit our use case
+# https://seaborn.pydata.org/examples/spreadsheet_heatmap.html
+import matplotlib.pyplot as plt
+import seaborn as sns
+import pandas as pd
+df2 = pd.DataFrame(sum_pij_array,
+                   columns=['slack bus', 'node 1', 'node 2', 'node 3'],
+                   index=['t = 1', 't = 2', 't = 3', 't = 4'])
+
+# Draw a heatmap with the numeric values in each cell
+f, ax = plt.subplots(figsize=(5, 4))
+sns.heatmap(df2, annot=True, linewidths=.5, ax=ax)
+
+# modeled directly after example from:
+# https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.plot.bar.html
+import pandas as pd
+index = ['slack bus', 'node 1', 'node 2', 'node 3']
+
+#Timestep 1 (index 0)
+p_ij_initial1 = p_ij_initial[0,:]
+p_b_result1 = b_p[0,:]
+sum_pij_result1 = sum_pij_array[0,:]
+df1 = pd.DataFrame({'Sum of all Trades': sum_pij_result1, 'Battery': p_b_result1, 'Forecast Power': p_ij_initial1}, index=index)
+ax1 = df1.plot.bar(title="Timestep 1")
+
+#Timestep 2 (index 1)
+p_ij_initial2 = p_ij_initial[1,:]
+p_b_result2 = b_p[1,:]
+sum_pij_result2 = sum_pij_array[1,:]
+df2 = pd.DataFrame({'Sum of all Trades': sum_pij_result2, 'Battery': p_b_result2, 'Forecast Power': p_ij_initial2}, index=index)
+ax2 = df2.plot.bar(title="Timestep 2")
+
+#Timestep 3 (index 2)
+p_ij_initial3 = p_ij_initial[2,:]
+p_b_result3 = b_p[2,:]
+sum_pij_result3 = sum_pij_array[2,:]
+df3 = pd.DataFrame({'Sum of all Trades': sum_pij_result3, 'Battery': p_b_result3, 'Forecast Power': p_ij_initial3}, index=index)
+ax3 = df3.plot.bar(title="Timestep 3")
+
+#Timestep 4 (index 3)
+p_ij_initial4 = p_ij_initial[3,:]
+p_b_result4 = b_p[3,:]
+sum_pij_result4 = sum_pij_array[3,:]
+df4 = pd.DataFrame({'Sum of all Trades': sum_pij_result4, 'Battery': p_b_result4, 'Forecast Power': p_ij_initial4}, index=index)
+ax4 = df4.plot.bar(title="Timestep 4")
