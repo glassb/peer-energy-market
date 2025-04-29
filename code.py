@@ -525,10 +525,3 @@ voltage_diff_mtx = linearalgebra.block_diag(diff_mtx, diff_mtx, diff_mtx, diff_m
 all_node_voltage_diff = np.matmul(voltage_diff_mtx, all_node_voltage)
 
 all_node_voltage_diff_squared = np.matmul(np.diag(all_node_voltage_diff), all_node_voltage_diff)
-
-
-
-print(all_node_voltage_diff_squared)
-resistancearr = np.array([[1, -1, 0, 0],
-                          [0, 1, -1, 0],
-                          [0, 0, 1, -1]])
