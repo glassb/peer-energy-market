@@ -49,7 +49,7 @@ z_base = (v_base * v_base)/s_base  #kOhms
 #Slack bus NOT included!!!
 # t1 = 0000 - 0400, t2 = 0400 - 0800, t3 = 0800 - 1200, t4 = 1200 - 1600
 # node 1,2,3 have PV.
-scheduledinjection = np.array([[-11.5/s_base], [-10/s_base], [-12/s_base], [3/s_base], [3.5/s_base], [4/s_base], [71/s_base], [70/s_base], [68/s_base], [67/s_base], [65/s_base], [63/s_base]])
+scheduledinjection = np.array([[-11.5], [-11.5], [-11.5], [3.4], [3.4], [3.4], [72], [72], [72], [68], [68], [68]])
 
 # Below is an alternative scheduled injection array. node 1,2 have PV. node 3 does not have a PV but does have a battery.
 #scheduledinjection = np.array([[-11.5/s_base], [-10/s_base], [-12/s_base], [3/s_base], [3.5/s_base], [-8.5/s_base], [71/s_base], [70/s_base], [-2.5/s_base], [67/s_base], [65/s_base], [-2.5/s_base]])
