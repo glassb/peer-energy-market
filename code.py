@@ -51,9 +51,6 @@ z_base = (v_base * v_base)/s_base  #kOhms
 # node 1,2,3 have PV.
 scheduledinjection = np.array([[-11.5], [-11.5], [-11.5], [3.4], [3.4], [3.4], [72], [72], [72], [68], [68], [68]])
 
-# Below is an alternative scheduled injection array. node 1,2 have PV. node 3 does not have a PV but does have a battery.
-#scheduledinjection = np.array([[-11.5/s_base], [-10/s_base], [-12/s_base], [3/s_base], [3.5/s_base], [-8.5/s_base], [71/s_base], [70/s_base], [-2.5/s_base], [67/s_base], [65/s_base], [-2.5/s_base]])
-
 #we can set individual bounds for any of the decision variables
 bounds = []
 # ---------------------------------- General Variables
