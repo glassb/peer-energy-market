@@ -591,3 +591,39 @@ df2 = pd.DataFrame(sum_pij_array,
                    columns=['slack bus', 'node 1', 'node 2', 'node 3'],
                    index=['t = 1', 't = 2', 't = 3', 't = 4'])
 
+# Draw a heatmap with the numeric values in each cell
+f, ax = plt.subplots(figsize=(5, 4))
+sns.heatmap(df2, annot=True, linewidths=.5, ax=ax)
+
+# modeled directly after example from:
+# https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.plot.bar.html
+import pandas as pd
+index = ['slack bus', 'node 1', 'node 2', 'node 3']
+
+#Timestep 1 (index 0)
+p_ij_initial1 = p_ij_initial[0,:]
+p_b_result1 = b_p[0,:]
+sum_pij_result1 = sum_pij_array[0,:]
+df1 = pd.DataFrame({'Sum of all Trades': sum_pij_result1, 'Battery': p_b_result1, 'Forecast Power': p_ij_initial1}, index=index)
+ax1 = df1.plot.bar(title="Timestep 1")
+
+#Timestep 2 (index 1)
+p_ij_initial2 = p_ij_initial[1,:]
+p_b_result2 = b_p[1,:]
+sum_pij_result2 = sum_pij_array[1,:]
+df2 = pd.DataFrame({'Sum of all Trades': sum_pij_result2, 'Battery': p_b_result2, 'Forecast Power': p_ij_initial2}, index=index)
+ax2 = df2.plot.bar(title="Timestep 2")
+
+#Timestep 3 (index 2)
+p_ij_initial3 = p_ij_initial[2,:]
+p_b_result3 = b_p[2,:]
+sum_pij_result3 = sum_pij_array[2,:]
+df3 = pd.DataFrame({'Sum of all Trades': sum_pij_result3, 'Battery': p_b_result3, 'Forecast Power': p_ij_initial3}, index=index)
+ax3 = df3.plot.bar(title="Timestep 3")
+
+#Timestep 4 (index 3)
+p_ij_initial4 = p_ij_initial[3,:]
+p_b_result4 = b_p[3,:]
+sum_pij_result4 = sum_pij_array[3,:]
+df4 = pd.DataFrame({'Sum of all Trades': sum_pij_result4, 'Battery': p_b_result4, 'Forecast Power': p_ij_initial4}, index=index)
+ax4 = df4.plot.bar(title="Timestep 4")
