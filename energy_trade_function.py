@@ -294,9 +294,6 @@ def solve(inj, battlvl, subtarget, subweight):
     constraint_19bp1_min,
     constraint_19bp1_max,
 
-    # (19bp2) constraints: Max Injection Constraint
-    # constraint_19bp2_min,
-    # constraint_19bp2_max,
 
     # (19c) constraints: Voltage Constraints
     constraint_19c_min,
@@ -323,43 +320,6 @@ def solve(inj, battlvl, subtarget, subweight):
      'fun': lambda x: np.matmul(totalbattpower, (np.matmul(sumj_Pijt, x) - np.ndarray.flatten(scheduledinjection)))},
   )
 
-  # -------------------------------------------- Cost Function 1 ---------------------------------------------------
-
-  '''
-  #cost function formulation: this can be quadratic or linear
-  consumer charge is form ax^2 + bx where a and b are coefficients chosen by the consumer
-  To get in the cost function form we will see (x)T*A*x + bx where A a matrix form:
-  
-  [a1 0   0   0   0   0]
-  [0  a1  0   0   0   0]
-  [0  0   a1  0   0   0]
-  [0  0   0   a2  0   0]
-  [0  0   0   0   a2  0]
-  [0  0   0   0   0  a2]
-  
-  and b is a vector [b1 b1 b1 b2 b2 b2]
-  
-  corresponding to the indices of i. That is, all entries in a and b will be ai and bi for pi
-  '''
-
-  '''   ------------------unused for now---------------------------
-  def cost_function(x, quad_coefficients, lin_coefficients):
-  
-    Q = np.zeros((vars_per_timeblock * timeblocks_no, vars_per_timeblock * timeblocks_no))
-    C = np.zeros((vars_per_timeblock * timeblocks_no))
-    for t in range(timeblocks_no):
-      for i in range(nodecount):
-        for j in range(nodecount):
-          indexval = t * (nodecount ** 2) + i * nodecount + j
-          Q[indexval][indexval] = quad_coefficients[i]
-          C[indexval] = lin_coefficients[i]
-  
-    #Original general return proposed in the paper. We modify
-    ##return np.matmul(np.transpose(x),np.matmul(Q,x)) + np.matmul(C,x)
-      return np.matmul(np.ones(64), np.maximum(np.zeros(64), x)) #doesn't use the quadratic terms, this is a work in progress
-  '''
-
-  # -------------------------------------------- END Cost Function 1 ---------------------------------------------------
 
   # set initial guess for every prosumer to get all their power from the grid
   initial_guess = np.tile(np.zeros(vars_per_timeblock), timeblocks_no)
@@ -369,19 +329,8 @@ def solve(inj, battlvl, subtarget, subweight):
       initial_guess[((j + 1) * nodecount) + (i * vars_per_timeblock)] = scheduledinjection[j + (i * (nodecount - 1))][0]
 
 
-  # ---------------------------------------------------------------------- Cost Function 2
-  # Kelsey's Version of Cost Function (Incentivizes sending some predetermined amount to slack bus)
 
-  # Set negative target injection that slack bus would like to achieve (the target power that slack wants to receive)
-  # P_0_target = np.array([[12],
-  # [1],
-  # [1],
-  # [12]])
-
-  # timepoint_weights = np.array([[10], [2], [3], [1]])
-
-  # ----------------------------------------------------- COST FUNCTION -----------------------------------------------
-  # actual cost function
+  # -------------------------------- COST FUNCTION --------------------------------------------
   def cost_function(x, P_0_target, timepoint_weights, resistance_matrix, vbar):
     # Kelsey's P0 Target Injection
     # setting up structure/variables for cost function
@@ -407,8 +356,9 @@ def solve(inj, battlvl, subtarget, subweight):
     middleman_penalty = ((np.matmul(np.ones(64), np.maximum(np.zeros(64), x))) ** 2) * 0.01
     return middleman_penalty + P0_target_penalty
 
+  # ---------------------------- END COST FUNCTION -------------------------------------------------------
 
-  # ---------------------------------------------------------Initial Guess
+
   # set initial guess for every prosumer to get all their power from the grid
   initial_guess = np.tile(np.zeros(vars_per_timeblock), timeblocks_no)
   for i in range(timeblocks_no):
@@ -417,12 +367,8 @@ def solve(inj, battlvl, subtarget, subweight):
       initial_guess[((j + 1) * nodecount) + (i * vars_per_timeblock)] = scheduledinjection[j + (i * (nodecount - 1))][0]
 
 
-  # ----------------------------------------------------------Optimization Problem Results
 
   # return results of optimization problem
-  results = opt.minimize(fun=cost_function, args=(P_0_target, timepoint_weights, R_matrix_4_timesteps, v_bar_4_timesteps),
-                         x0=initial_guess, constraints=constraint,
-                         options={"maxiter": 100, "ftol": 1e-5, "disp": True})  # can add method="method"
 
   # Status:
   # 0 = optimal solution found
@@ -432,62 +378,9 @@ def solve(inj, battlvl, subtarget, subweight):
   # 6 = ill-conditioned matrix
   # 8 = did not converge in iteration limit
   # 9 = failed, can't make further progress
+  results = opt.minimize(fun=cost_function, args=(P_0_target, timepoint_weights, R_matrix_4_timesteps, v_bar_4_timesteps),
+                         x0=initial_guess, constraints=constraint,
+                         options={"maxiter": 100, "ftol": 1e-5, "disp": True})  # can add method="method"
 
 
-  # round all values to a specific decimal precision
-  decimal_precision = 2
-  for i in range(64):
-    # Values that will display as -0.0 are rounded to zero
-    if results.x[i] <= 0 and results.x[i] >= -1 * (0.1 ** (decimal_precision)):
-      results.x[i] = 0
-    results.x[i] = round(results.x[i], decimal_precision)
-
-  # printing the output
-  #for i in range(64):
-  #  print(timesteps[i // 16], '--', decision_variables[i % 16], ':  ', results.x[i], 'per unit')
-
-  # unsure what this is, but had to move it down below the solver
-  transform = [[0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0],
-               [0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0],
-               [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1]]
-
-  fourTransform = linearalgebra.block_diag(transform, transform, transform, transform)
-
-
-
-  # ----------------------------------------------------- Recovering P_injected_battery = Sum_P_ij - P_scheduled_inj
-
-  # This block of code sums all trades from a particular node to all other nodes at timestep t into an array structure like below.
-  # ts = 0, from node 0 | ts = 1, from node 1 | ts = 1, from node 2 | ts = 1, from node 3 |
-  # ts = 1, from node 0 | ts = 2, from node 1 | ts = 2, from node 2 | ts = 2, from node 3 |
-  # ts = 2, from node 0 | ts = 3, from node 1 | ts = 3, from node 2 | ts = 3, from node 3 |
-  # ts = 3, from node 0 | ts = 4, from node 1 | ts = 4, from node 2 | ts = 4, from node 3 |
-
-  idx = 0
-
-
-  # ------------------------------------ RYAN BATTERY STATE --------------------------------------------
-  tradesum_arr = linearalgebra.block_diag(np.ones(4), np.ones(4), np.ones(4), np.ones(4))
-  tradesum_arr_t = linearalgebra.block_diag(tradesum_arr, tradesum_arr, tradesum_arr, tradesum_arr)
-
-  # Trade Sum
-  tradesum = np.matmul(tradesum_arr_t, results.x)
-
-  # power battery injects to node
-  battery_power = np.matmul(sumj_Pijt, results.x) - np.ndarray.flatten(scheduledinjection)
-
-  # battery state at the START of each timestep
-  battery_state = np.ndarray.flatten(batt_initial_t) - (np.matmul(energyadded, np.matmul(sumj_Pijt, results.x) - np.ndarray.flatten(scheduledinjection)) * timestep_duration)
-
-  # Voltage at nodes
-  node_voltage = np.sqrt(
-    np.matmul(R_matrix_4_timesteps, np.matmul(sum_pij_4_timesteps, results.x)) + np.ndarray.flatten(v_bar_4_timesteps))
-
-  print("Battery State BEFORE timestep: \n", np.reshape(battery_state, (4, 3)))
-  print("Battery Power:                 \n", np.reshape(battery_power, (4, 3)))
-  print("Power Injected at all nodes:   \n", np.reshape(tradesum, (4, 4)))
-  print("Node Voltages:                 \n", np.reshape(node_voltage, (4, 3)))
-
-
-  secondbatterystate = np.ndarray.flatten(battery_state[3:6])
-  return secondbatterystate
+  return results.x
