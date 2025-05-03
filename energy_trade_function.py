@@ -347,8 +347,6 @@ def solve(inj, battlvl, subtarget, subweight):
     P0_weighted_targetdiff = np.matmul(weights_diag, np.matmul(sum_Pi0t, x) - np.ndarray.flatten(P_0_target))
     P0_target_penalty = (np.matmul(np.transpose(P0_weighted_targetdiff), P0_weighted_targetdiff))
 
-    # Ryan's voltage losses
-    node_voltages = np.matmul(resistance_matrix, np.matmul(sum_pij_4_timesteps, x)) + np.ndarray.flatten(vbar)
 
     # Ryan's middleman restriction
     # Sums all the outgoing (positive) trades. This is convex because max is convex. If there is a middleman trade, the outgoing trade from origin to destination is duplicated as a middleman outgoing

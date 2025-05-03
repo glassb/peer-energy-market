@@ -14,11 +14,15 @@ Implementation of a P2P Electricity Market on a distribution system with battery
 **Note:** A detailed table of values used for all voltage, power, and DER constraints can be accessed on request.
 
 ## File Structure
-- **Code.py** : main file with problem formulation.
+- **code.py** : Is a standalone script that optimizes power injection of four nodes over four timesteps.
 - **ConstraintTesting.py** : Runs problem with varying constraint values to test constraint sensetivity. 
+- **energy_trade_function.py** : A script that refactors much of code.py into a function, most min/max parameters are hard-coded, whereas schedulable injections and injection targets are arguments. Returns all optimal trades for all times. Is called by time_horizons.py
+- **time_horizons.py** : includes energy_trade_function, calls the solver iteratively, walking through a block of schedulable parameters. Every iteration, it recalculates and updates initial battery states for the next round.
+	To run time_horizons.py:
+		input the desired scheduled injections, utility targets, utility priority (how much the utility cares about meeting the target for that indexed time), and initial battery states for time zero.
+		Make sure row number for scheduled injections matches number of entries for utility targets and priorities.
+	Initial battery state should always be 3 entries (system has 3 batteries)
+
 
 ## End Matter
 This project was completed for as a final project for EC500 at Boston University (Spring 2025).
-
-
-
