@@ -2,7 +2,7 @@
 Project contributors: Ryan Hekman, Kelsey Sweeney, and Ben Glass
 
 ## Context
-Implementation of a P2P Electricity Market on a distribution system with battery storage. Theory, problem formulation, and algorithms are based on the work from [Ullah & Park](https://ieeexplore.ieee.org/document/9369412) (2021)
+Implementation of a P2P Electricity Market on a distribution system with battery storage. Theory, problem formulation, and algorithms are based on the work from [Ullah & Park](https://ieeexplore.ieee.org/document/9369412) (2021).
 
 ## Problem Setup
 - **Nodes:** 4 (including Slack bus)
