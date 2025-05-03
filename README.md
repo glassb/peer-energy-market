@@ -1,5 +1,5 @@
 # Peer-to-Peer Electricity Market
-Project contributors: *Ryan Hekman, Kelsey Sweeney, and Ben Glass*
+Project contributors: **Ryan Hekman, Kelsey Sweeney, and Ben Glass**
 
 Implementation of a P2P Electricity Market on an 4-node distribution system with battery storage.  
 
