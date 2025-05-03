@@ -14,7 +14,8 @@ Implementation of a P2P Electricity Market on a distribution system with battery
 **Note:** A detailed table of values used for all voltage, power, and DER constraints can be accessed on request.
 
 ## File Structure
-- **Code.py** : main file with problem formulation. 
+- **Code.py** : main file with problem formulation.
+- **ConstraintTesting.py** : Runs problem with varying constraint values to test constraint sensetivity. 
 
 ## End Matter
 This project was completed for as a final project for EC500 at Boston University (Spring 2025).
