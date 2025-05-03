@@ -11,10 +11,11 @@ Implementation of a P2P Electricity Market on a distribution system with battery
 - **Timestep Duration:** 4 hours
 - **Optimization Solver:** SciPy [Optimize](https://docs.scipy.org/doc/scipy/reference/generated/scipy.optimize.minimize.html).
 
+* A detailed table of values used for all voltage, power, and DER constraints can be accessed on request.
 - 
 
 ## Notes
-This project was completed for as a final project for EC500 at Boston University (Spring 2025).
+This project was completed for as a final project for EC500 at Boston University (Spring 2025). Pull requests and comments are welcome.
 
 
 
