@@ -9,7 +9,7 @@ Implementation of a P2P Electricity Market on a distribution system with battery
 - **Network Model Type:** Radial (Linearized DistFlow)
 - **Timesteps:** 4
 - **Timestep Duration:** 4 hours
-- **Optimization Solver:** SciPy [Optimize] (https://docs.scipy.org/doc/scipy/reference/generated/scipy.optimize.minimize.html).
+- **Optimization Solver:** SciPy [Optimize](https://docs.scipy.org/doc/scipy/reference/generated/scipy.optimize.minimize.html).
 
 ## Notes
 This project was completed for as a final project for EC500 at Boston University (Spring 2025).
