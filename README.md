@@ -22,7 +22,7 @@ Implementation of a P2P Electricity Market on a distribution system with battery
 		input the desired scheduled injections, utility targets, utility priority (how much the utility cares about meeting the target for that indexed time), and initial battery states for time zero.
 		Make sure row number for scheduled injections matches number of entries for utility targets and priorities.
 	Initial battery state should always be 3 entries (system has 3 batteries)
-
+- **simulationNodeZeroReq** : A copy of code.py modified to simulate and graph how the battery at node 1 will change energy state in respond to varying requests from node 0.
 
 ## End Matter
 This project was completed for as a final project for EC500 at Boston University (Spring 2025).
