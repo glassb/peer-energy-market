@@ -24,5 +24,5 @@ Implementation of a P2P Electricity Market on a distribution system with battery
 	Initial battery state should always be 3 entries (system has 3 batteries)
 - **simulationNodeZeroReq.py** : A copy of code.py modified to simulate and graph how the battery at node 1 will change energy state in respond to varying requests from node 0.
 
-## End Matter
+## More Info
 This project was completed as a final project for EC500 (Control of Sustainable Power Systems) at Boston University during Spring 2025.
