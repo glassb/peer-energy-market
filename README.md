@@ -25,4 +25,4 @@ Implementation of a P2P Electricity Market on a distribution system with battery
 - **simulationNodeZeroReq.py** : A copy of code.py modified to simulate and graph how the battery at node 1 will change energy state in respond to varying requests from node 0.
 
 ## End Matter
-This project was completed for as a final project for EC500 at Boston University (Spring 2025).
+This project was completed as a final project for EC500 (Control of Sustainable Power Systems) at Boston University during Spring 2025.
